@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Rupee expense tracker icon">
+  <rect width="512" height="512" rx="96" fill="#0f6b5f"/>
+  <path d="M120 148h272" stroke="#ffffff" stroke-width="30" stroke-linecap="round"/>
+  <path d="M120 206h272" stroke="#ffffff" stroke-width="30" stroke-linecap="round" opacity=".86"/>
+  <path d="M226 148h48c72 0 111 28 111 79 0 54-43 86-117 86h-35l138 122H299L161 309v-43h99c38 0 62-14 66-40H120v-20z" fill="#ffffff"/>
+  <circle cx="376" cy="376" r="54" fill="#f8c35a"/>
+  <path d="M354 376h45M376 354v45" stroke="#0f6b5f" stroke-width="20" stroke-linecap="round"/>
+</svg>

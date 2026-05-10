@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0f6b5f">
+    <title>Rupee Expense Tracker</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Personal Budget</p>
+          <h1>Rupee Expense Tracker</h1>
+        </div>
+        <button class="icon-button" id="installButton" type="button" hidden aria-label="Install app" title="Install app">
+          <span aria-hidden="true">+</span>
+        </button>
+      </header>
+
+      <section class="summary-grid" aria-label="Budget summary">
+        <article class="metric budget-card">
+          <span>Budget</span>
+          <strong id="budgetValue">₹0.00</strong>
+        </article>
+        <article class="metric">
+          <span>Total Spent</span>
+          <strong id="spentValue">₹0.00</strong>
+        </article>
+        <article class="metric">
+          <span>Remaining</span>
+          <strong id="remainingValue">₹0.00</strong>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Set Budget</h2>
+        </div>
+        <form id="budgetForm" class="budget-form">
+          <label>
+            <span>Total budget amount</span>
+            <input id="budgetInput" inputmode="decimal" autocomplete="off" placeholder="50000" required>
+          </label>
+          <button type="submit">Set Budget</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Add Purchase</h2>
+        </div>
+        <form id="expenseForm" class="expense-form">
+          <label>
+            <span>Item name or description</span>
+            <input id="descriptionInput" autocomplete="off" placeholder="Groceries, bus pass, books" required>
+          </label>
+          <label>
+            <span>Amount spent</span>
+            <input id="amountInput" inputmode="decimal" autocomplete="off" placeholder="1250" required>
+          </label>
+          <label>
+            <span>Date of purchase</span>
+            <input id="dateInput" type="date" required>
+          </label>
+          <button type="submit">Add New Expense</button>
+        </form>
+      </section>
+
+      <section class="panel records-panel">
+        <div class="section-title records-title">
+          <h2>Expense Records</h2>
+          <div class="actions">
+            <button type="button" id="viewAllButton">View All</button>
+            <button type="button" id="summaryButton">Summary</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th class="amount-column">Amount</th>
+              </tr>
+            </thead>
+            <tbody id="expenseRows"></tbody>
+          </table>
+          <p id="emptyState" class="empty-state">No expenses recorded yet.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Export</h2>
+        </div>
+        <div class="export-grid">
+          <button type="button" id="pdfButton">PDF</button>
+          <button type="button" id="docxButton">Word .docx</button>
+          <button type="button" id="xlsxButton">Excel .xlsx</button>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="summaryDialog">
+      <form method="dialog">
+        <h2>Budget Summary</h2>
+        <dl class="dialog-summary">
+          <div><dt>Budget</dt><dd id="dialogBudget">₹0.00</dd></div>
+          <div><dt>Total Spent</dt><dd id="dialogSpent">₹0.00</dd></div>
+          <div><dt>Remaining</dt><dd id="dialogRemaining">₹0.00</dd></div>
+          <div><dt>Expense Count</dt><dd id="dialogCount">0</dd></div>
+        </dl>
+        <button type="submit">Close</button>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js" defer></script>
+  </body>
+</html>

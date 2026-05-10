@@ -1,0 +1,344 @@
+:root {
+  color-scheme: light;
+  --bg: #eef4f2;
+  --panel: #ffffff;
+  --ink: #17211f;
+  --muted: #65736f;
+  --line: #d8e1de;
+  --accent: #0f6b5f;
+  --accent-dark: #094d45;
+  --warn: #9a5b00;
+  --danger: #a23838;
+  --shadow: 0 12px 30px rgba(22, 44, 39, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(15, 107, 95, 0.28);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 18px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0 18px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: clamp(1.8rem, 7vw, 3.2rem);
+  line-height: 1.02;
+}
+
+h2 {
+  font-size: 1.02rem;
+}
+
+.icon-button {
+  width: 48px;
+  min-width: 48px;
+  border-radius: 50%;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.metric,
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.metric {
+  min-width: 0;
+  padding: 16px;
+}
+
+.metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  font-size: clamp(1.2rem, 4vw, 2rem);
+  line-height: 1.1;
+}
+
+.budget-card {
+  border-color: rgba(15, 107, 95, 0.3);
+}
+
+.panel {
+  margin-bottom: 14px;
+  padding: 16px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.budget-form,
+.expense-form {
+  display: grid;
+  gap: 12px;
+}
+
+.expense-form {
+  grid-template-columns: 1.6fr 0.8fr 0.9fr auto;
+  align-items: end;
+}
+
+.budget-form {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+label span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+  color: var(--ink);
+  padding: 10px 12px;
+}
+
+.records-panel {
+  padding-bottom: 8px;
+}
+
+.records-title {
+  align-items: flex-start;
+}
+
+.actions,
+.export-grid {
+  display: flex;
+  gap: 8px;
+}
+
+.actions button,
+.export-grid button {
+  background: #e8f1ee;
+  color: var(--accent-dark);
+}
+
+.table-wrap {
+  position: relative;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.amount-column {
+  text-align: right;
+}
+
+td.amount-column {
+  font-weight: 800;
+}
+
+.empty-state {
+  margin: 16px 0 8px;
+  color: var(--muted);
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+dialog {
+  width: min(420px, calc(100% - 28px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+  box-shadow: 0 20px 70px rgba(20, 35, 31, 0.22);
+}
+
+dialog::backdrop {
+  background: rgba(14, 27, 24, 0.36);
+}
+
+dialog form {
+  padding: 18px;
+}
+
+.dialog-summary {
+  margin: 16px 0;
+}
+
+.dialog-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+dt {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  max-width: min(360px, calc(100% - 32px));
+  border-radius: 8px;
+  background: #13221f;
+  color: #ffffff;
+  padding: 12px 14px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 820px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-form,
+  .budget-form {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .records-title {
+    display: grid;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    padding: 14px;
+  }
+
+  .panel,
+  .metric {
+    padding: 14px;
+  }
+
+  .export-grid {
+    grid-template-columns: 1fr;
+  }
+
+  table {
+    min-width: 480px;
+  }
+}
