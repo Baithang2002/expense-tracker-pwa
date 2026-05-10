@@ -83,6 +83,15 @@ function addExpense(description, amount, purchaseDate) {
   return expense;
 }
 
+function deleteExpense(expenseId) {
+  const startingCount = state.expenses.length;
+  state.expenses = state.expenses.filter((expense) => expense.id !== expenseId);
+  if (state.expenses.length === startingCount) {
+    throw new Error("Expense record was not found.");
+  }
+  saveState();
+}
+
 function validateExpense(description, amount, purchaseDate) {
   if (!description) throw new Error("Enter an item name or description.");
   if (!Number.isFinite(amount) || amount <= 0) throw new Error("Amount must be greater than zero.");
@@ -132,6 +141,7 @@ function renderExpenses() {
       tableCell(formatDate(expense.purchaseDate)),
       tableCell(expense.description),
       tableCell(formatINR(expense.amount), "amount-column"),
+      actionCell(expense),
     );
     elements.expenseRows.append(row);
   }
@@ -146,6 +156,32 @@ function tableCell(text, className = "") {
   const cell = document.createElement("td");
   cell.textContent = text;
   if (className) cell.className = className;
+  return cell;
+}
+
+function actionCell(expense) {
+  const cell = document.createElement("td");
+  cell.className = "action-column";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "delete-button";
+  button.textContent = "Delete";
+  button.setAttribute("aria-label", `Delete ${expense.description}`);
+  button.addEventListener("click", () => {
+    const confirmed = window.confirm(`Delete this expense?\n\n${expense.description} - ${formatINR(expense.amount)}`);
+    if (!confirmed) return;
+
+    try {
+      deleteExpense(expense.id);
+      renderApp();
+      showToast("Expense deleted");
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  cell.append(button);
   return cell;
 }
 

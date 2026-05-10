@@ -226,12 +226,21 @@ th {
   text-transform: uppercase;
 }
 
-.amount-column {
+.amount-column,
+.action-column {
   text-align: right;
 }
 
 td.amount-column {
   font-weight: 800;
+}
+
+.delete-button {
+  min-height: 36px;
+  border: 1px solid rgba(162, 56, 56, 0.24);
+  background: #fff0f0;
+  color: var(--danger);
+  padding: 8px 12px;
 }
 
 .empty-state {
@@ -339,6 +348,6 @@ dd {
   }
 
   table {
-    min-width: 480px;
+    min-width: 560px;
   }
 }
