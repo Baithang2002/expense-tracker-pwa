@@ -546,12 +546,10 @@ function renderSelectors() {
   elements.transactionBudget.innerHTML = budgetOptions;
   elements.transactionBudget.value = state.activeBudgetId;
 
-  elements.budgetFilter.innerHTML = state.budgets
-    .map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`)
-    .join("");
-  [...elements.budgetFilter.options].forEach((o) => {
-    o.selected = filters.budgetIds.includes(o.value);
-  });
+  elements.budgetFilter.innerHTML =
+    `<option value="all">All Budgets</option>` +
+    state.budgets.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
+  elements.budgetFilter.value = filters.budgetIds[0] || "all";
 
   elements.analyticsBudgetSelect.innerHTML = `<option value="all">All Budgets</option>${budgetOptions}`;
   elements.analyticsBudgetSelect.value = analyticsBudgetId;
@@ -644,7 +642,7 @@ function budgetCardHtml(budget, compact) {
   const activeClass = budget.id === state.activeBudgetId ? " active" : "";
   const overBudget = budget.limit > 0 && totals.expenses > budget.limit;
   return `
-    <article class="budget-card${activeClass}">
+    <article class="budget-card${activeClass}" data-select-budget="${budget.id}" tabindex="0" role="button" aria-label="Switch to ${escapeHtml(budget.name)}">
       <header>
         <div>
           <h3>${escapeHtml(budget.name)}</h3>
@@ -660,7 +658,6 @@ function budgetCardHtml(budget, compact) {
         compact
           ? ""
           : `<footer>
-          <button class="edit-button" type="button" data-select-budget="${budget.id}">Switch</button>
           <button class="edit-button" type="button" data-edit-budget="${budget.id}">Edit</button>
           <button class="delete-button" type="button" data-delete-budget="${budget.id}">Delete</button>
         </footer>`
@@ -1277,7 +1274,15 @@ const XLSX_WORKBOOK_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes
 // ── Event listeners ────────────────────────────────────────────────────────────
 
 document.addEventListener("click", (e) => {
+  const card = e.target.closest("[data-select-budget]");
   const target = e.target.closest("button");
+  if (card && !target) {
+    state.activeBudgetId = card.dataset.selectBudget;
+    saveState();
+    render();
+    showToast("Budget switched");
+    return;
+  }
   if (!target) return;
   if (target.dataset.nav) setView(target.dataset.nav);
   if (target.dataset.openTransaction) openTransactionDialog(target.dataset.openTransaction);
@@ -1285,12 +1290,6 @@ document.addEventListener("click", (e) => {
   if (target.dataset.editTransaction) openTransactionDialog("expense", target.dataset.editTransaction);
   if (target.dataset.deleteTransaction) deleteTransaction(target.dataset.deleteTransaction);
   if (target.dataset.viewReceipt) viewReceipt(target.dataset.viewReceipt);
-  if (target.dataset.selectBudget) {
-    state.activeBudgetId = target.dataset.selectBudget;
-    saveState();
-    render();
-    showToast("Budget switched");
-  }
   if (target.dataset.editBudget) openBudgetDialog(target.dataset.editBudget);
   if (target.dataset.deleteBudget) deleteBudget(target.dataset.deleteBudget);
   if (target.dataset.editCategory) openCategoryDialog(target.dataset.editCategory);
@@ -1298,6 +1297,15 @@ document.addEventListener("click", (e) => {
   if (target.dataset.export === "csv") exportCsv();
   if (target.dataset.export === "xlsx") exportXlsx();
   if (target.dataset.export === "pdf") exportPdf();
+});
+
+document.addEventListener("keydown", (e) => {
+  if ((e.key !== "Enter" && e.key !== " ") || !e.target.matches("[data-select-budget]")) return;
+  e.preventDefault();
+  state.activeBudgetId = e.target.dataset.selectBudget;
+  saveState();
+  render();
+  showToast("Budget switched");
 });
 
 // Dialog close buttons (type="button" — no form submit side-effects)
@@ -1379,7 +1387,8 @@ elements.categoryFilter.addEventListener("change", () => {
 });
 
 elements.budgetFilter.addEventListener("change", () => {
-  filters.budgetIds = [...elements.budgetFilter.selectedOptions].map((o) => o.value);
+  filters.budgetIds =
+    elements.budgetFilter.value === "all" ? [] : [elements.budgetFilter.value];
   renderTransactions();
 });
 
