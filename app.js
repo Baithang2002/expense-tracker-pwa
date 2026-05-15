@@ -1,5 +1,6 @@
 const STORAGE_KEY = "finance-manager-v1";
 const LEGACY_KEY = "expense-tracker-state-v1";
+const MAX_RECEIPT_BYTES = 1_500_000;
 
 const INR = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -195,7 +196,13 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    throw new Error(
+      "Storage is full. Remove a large receipt photo or export a backup before adding more data.",
+    );
+  }
 }
 
 function normalizeState(input) {
@@ -373,6 +380,20 @@ function deleteTransaction(id) {
   saveState();
   render();
   showToast("Transaction deleted");
+}
+
+function viewReceipt(id) {
+  const t = state.transactions.find((item) => item.id === id);
+  if (!t?.receiptData) {
+    showToast("No receipt saved for this transaction");
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.href = t.receiptData;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.click();
 }
 
 function addOrUpdateBudget(payload) {
@@ -665,6 +686,7 @@ function transactionHtml(t) {
         </div>
         <p class="muted">${formatDateTime(t.dateTime)}${t.notes ? ` · ${escapeHtml(t.notes)}` : ""}</p>
         <div class="transaction-actions">
+          ${t.receiptData ? `<button class="edit-button" type="button" data-view-receipt="${t.id}">View Receipt</button>` : ""}
           <button class="edit-button" type="button" data-edit-transaction="${t.id}">Edit</button>
           <button class="delete-button" type="button" data-delete-transaction="${t.id}">Delete</button>
         </div>
@@ -882,6 +904,12 @@ async function saveTransactionFromForm() {
 }
 
 function readReceipt(file) {
+  if (file.size > MAX_RECEIPT_BYTES) {
+    return Promise.reject(
+      new Error("Receipt photo is too large. Please choose an image under 1.5 MB."),
+    );
+  }
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve({ receiptName: file.name, receiptData: reader.result });
@@ -1256,6 +1284,7 @@ document.addEventListener("click", (e) => {
   if (target.dataset.openBudget !== undefined) openBudgetDialog();
   if (target.dataset.editTransaction) openTransactionDialog("expense", target.dataset.editTransaction);
   if (target.dataset.deleteTransaction) deleteTransaction(target.dataset.deleteTransaction);
+  if (target.dataset.viewReceipt) viewReceipt(target.dataset.viewReceipt);
   if (target.dataset.selectBudget) {
     state.activeBudgetId = target.dataset.selectBudget;
     saveState();
