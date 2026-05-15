@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#0f6b5f">
-    <title>Rupee Expense Tracker</title>
+    <meta name="theme-color" content="#176b5d">
+    <title>Rupee Finance Manager</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -12,115 +12,315 @@
   </head>
   <body>
     <main class="app-shell">
-      <header class="topbar">
+      <header class="app-header">
         <div>
-          <p class="eyebrow">Personal Budget</p>
-          <h1>Rupee Expense Tracker</h1>
+          <p class="eyebrow">Personal Finance</p>
+          <h1>Rupee Finance Manager</h1>
         </div>
-        <button class="icon-button" id="installButton" type="button" hidden aria-label="Install app" title="Install app">
-          <span aria-hidden="true">+</span>
-        </button>
+        <div class="header-actions">
+          <button class="icon-button" id="searchToggle" type="button" aria-label="Search transactions" title="Search">⌕</button>
+          <button class="icon-button" id="installButton" type="button" hidden aria-label="Install app" title="Install">+</button>
+        </div>
       </header>
 
-      <section class="summary-grid" aria-label="Budget summary">
-        <article class="metric budget-card">
-          <span>Budget</span>
-          <strong id="budgetValue">₹0.00</strong>
-        </article>
-        <article class="metric">
-          <span>Total Spent</span>
-          <strong id="spentValue">₹0.00</strong>
-        </article>
-        <article class="metric">
-          <span>Remaining</span>
-          <strong id="remainingValue">₹0.00</strong>
-        </article>
+      <section class="search-panel" id="searchPanel" hidden>
+        <label>
+          <span>Search by name, category, or amount</span>
+          <input id="globalSearch" type="search" placeholder="Search transactions">
+        </label>
       </section>
 
-      <section class="panel">
-        <div class="section-title">
-          <h2>Set Budget</h2>
+      <section class="view active" id="homeView" data-view="home">
+        <div class="dashboard-grid">
+          <article class="metric-card balance-card">
+            <span>Current Balance</span>
+            <strong id="currentBalance">₹0.00</strong>
+          </article>
+          <article class="metric-card">
+            <span>Total Income</span>
+            <strong class="income-text" id="totalIncome">₹0.00</strong>
+          </article>
+          <article class="metric-card">
+            <span>Total Expenses</span>
+            <strong class="expense-text" id="totalExpenses">₹0.00</strong>
+          </article>
         </div>
-        <form id="budgetForm" class="budget-form">
-          <label>
-            <span>Total budget amount</span>
-            <input id="budgetInput" inputmode="decimal" autocomplete="off" placeholder="50000" required>
-          </label>
-          <button type="submit">Set Budget</button>
-        </form>
-      </section>
 
-      <section class="panel">
-        <div class="section-title">
-          <h2>Add Purchase</h2>
-        </div>
-        <form id="expenseForm" class="expense-form">
-          <label>
-            <span>Item name or description</span>
-            <input id="descriptionInput" autocomplete="off" placeholder="Groceries, bus pass, books" required>
-          </label>
-          <label>
-            <span>Amount spent</span>
-            <input id="amountInput" inputmode="decimal" autocomplete="off" placeholder="1250" required>
-          </label>
-          <label>
-            <span>Date of purchase</span>
-            <input id="dateInput" type="date" required>
-          </label>
-          <button type="submit">Add New Expense</button>
-        </form>
-      </section>
+        <section class="quick-actions">
+          <button type="button" data-open-transaction="income">Add Income</button>
+          <button type="button" data-open-transaction="expense">Add Expense</button>
+          <button type="button" data-open-budget>Create Budget</button>
+          <button type="button" data-nav="analytics">View Analytics</button>
+        </section>
 
-      <section class="panel records-panel">
-        <div class="section-title records-title">
-          <h2>Expense Records</h2>
-          <div class="actions">
-            <button type="button" id="viewAllButton">View All</button>
-            <button type="button" id="summaryButton">Summary</button>
+        <section class="panel">
+          <div class="section-title">
+            <h2>Budget Overview</h2>
+            <select id="activeBudgetSelect" aria-label="Switch budget"></select>
           </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th class="amount-column">Amount</th>
-                <th class="action-column">Action</th>
-              </tr>
-            </thead>
-            <tbody id="expenseRows"></tbody>
-          </table>
-          <p id="emptyState" class="empty-state">No expenses recorded yet.</p>
-        </div>
+          <div class="budget-overview" id="budgetOverview"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Recent Transactions</h2>
+            <button class="soft-button" type="button" data-nav="transactions">View All</button>
+          </div>
+          <div class="transaction-list compact" id="recentTransactions"></div>
+        </section>
       </section>
 
-      <section class="panel">
-        <div class="section-title">
-          <h2>Export</h2>
-        </div>
-        <div class="export-grid">
-          <button type="button" id="pdfButton">PDF</button>
-          <button type="button" id="docxButton">Word .docx</button>
-          <button type="button" id="xlsxButton">Excel .xlsx</button>
-        </div>
+      <section class="view" id="transactionsView" data-view="transactions">
+        <section class="panel">
+          <div class="section-title wrap">
+            <h2>Transactions</h2>
+            <div class="actions">
+              <button type="button" data-open-transaction="income">Income</button>
+              <button type="button" data-open-transaction="expense">Expense</button>
+            </div>
+          </div>
+
+          <div class="filter-grid">
+            <div class="segmented" id="typeTabs" role="tablist" aria-label="Transaction type">
+              <button type="button" data-type-filter="all" class="active">All</button>
+              <button type="button" data-type-filter="income">Income</button>
+              <button type="button" data-type-filter="expense">Expenses</button>
+            </div>
+            <label>
+              <span>Quick time</span>
+              <select id="quickFilter">
+                <option value="all">All Time</option>
+                <option value="7">Last 7 Days</option>
+                <option value="30">Last 30 Days</option>
+                <option value="90">Last 90 Days</option>
+                <option value="year">This Year</option>
+              </select>
+            </label>
+            <label>
+              <span>From</span>
+              <input id="fromDate" type="datetime-local">
+            </label>
+            <label>
+              <span>To</span>
+              <input id="toDate" type="datetime-local">
+            </label>
+            <label>
+              <span>Category</span>
+              <select id="categoryFilter"></select>
+            </label>
+            <label>
+              <span>Budgets</span>
+              <select id="budgetFilter" multiple></select>
+            </label>
+          </div>
+
+          <div class="export-row">
+            <button class="soft-button" type="button" id="clearFilters">Clear Filters</button>
+            <button class="soft-button" type="button" data-export="csv">CSV</button>
+            <button class="soft-button" type="button" data-export="xlsx">Excel</button>
+            <button class="soft-button" type="button" data-export="pdf">PDF</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>History</h2>
+            <span class="muted" id="filteredCount">0 transactions</span>
+          </div>
+          <div class="transaction-list" id="transactionList"></div>
+        </section>
+      </section>
+
+      <section class="view" id="analyticsView" data-view="analytics">
+        <section class="panel">
+          <div class="section-title">
+            <h2>Analytics</h2>
+            <select id="analyticsBudgetSelect" aria-label="Analytics budget"></select>
+          </div>
+          <div class="analytics-grid">
+            <article class="metric-card">
+              <span>Income</span>
+              <strong class="income-text" id="analyticsIncome">₹0.00</strong>
+            </article>
+            <article class="metric-card">
+              <span>Expenses</span>
+              <strong class="expense-text" id="analyticsExpense">₹0.00</strong>
+            </article>
+            <article class="metric-card">
+              <span>Net</span>
+              <strong id="analyticsNet">₹0.00</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Expense Breakdown</h2>
+            <span class="muted" id="chartHint">Long press chart for details</span>
+          </div>
+          <div class="chart-layout">
+            <canvas id="expenseChart" width="320" height="320" aria-label="Expense category chart"></canvas>
+            <div class="category-breakdown" id="categoryBreakdown"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Monthly Summary</h2>
+          </div>
+          <div class="bars" id="monthlyBars"></div>
+        </section>
+      </section>
+
+      <section class="view" id="budgetsView" data-view="budgets">
+        <section class="panel">
+          <div class="section-title">
+            <h2>Budgets</h2>
+            <button type="button" data-open-budget>Create Budget</button>
+          </div>
+          <div class="budget-grid" id="budgetCards"></div>
+        </section>
+      </section>
+
+      <section class="view" id="settingsView" data-view="settings">
+        <section class="panel">
+          <div class="section-title">
+            <h2>Categories</h2>
+            <button type="button" id="openCategoryButton">Add Category</button>
+          </div>
+          <div class="category-grid" id="categoryCards"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Backup & Restore</h2>
+          </div>
+          <div class="settings-grid">
+            <button class="soft-button" type="button" id="backupButton">Export Backup</button>
+            <label class="file-button">
+              Restore Backup
+              <input id="restoreInput" type="file" accept="application/json">
+            </label>
+          </div>
+        </section>
+
+        <section class="panel danger-panel">
+          <h2>Reset Budget</h2>
+          <p>Clear all transactions for the selected budget. Budget and category settings will be kept.</p>
+          <button class="danger-button" type="button" id="resetBudgetButton">Reset Selected Budget</button>
+        </section>
       </section>
     </main>
 
-    <dialog id="summaryDialog">
-      <form method="dialog">
-        <h2>Budget Summary</h2>
-        <dl class="dialog-summary">
-          <div><dt>Budget</dt><dd id="dialogBudget">₹0.00</dd></div>
-          <div><dt>Total Spent</dt><dd id="dialogSpent">₹0.00</dd></div>
-          <div><dt>Remaining</dt><dd id="dialogRemaining">₹0.00</dd></div>
-          <div><dt>Expense Count</dt><dd id="dialogCount">0</dd></div>
-        </dl>
-        <button type="submit">Close</button>
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <button class="active" type="button" data-nav="home">⌂<span>Home</span></button>
+      <button type="button" data-nav="transactions">≡<span>Transactions</span></button>
+      <button type="button" data-nav="analytics">◔<span>Analytics</span></button>
+      <button type="button" data-nav="budgets">▦<span>Budgets</span></button>
+      <button type="button" data-nav="settings">⚙<span>Settings</span></button>
+    </nav>
+
+    <dialog id="transactionDialog">
+      <form id="transactionForm" method="dialog" class="dialog-form">
+        <div class="section-title">
+          <h2 id="transactionDialogTitle">Add Transaction</h2>
+          <button class="icon-button ghost" value="cancel" type="submit" aria-label="Close">×</button>
+        </div>
+        <input id="transactionId" type="hidden">
+        <input id="transactionType" type="hidden">
+        <label>
+          <span>Amount</span>
+          <input id="transactionAmount" inputmode="decimal" placeholder="1250" required>
+        </label>
+        <label>
+          <span>Description</span>
+          <input id="transactionDescription" placeholder="Salary, groceries, train ticket" required>
+        </label>
+        <label>
+          <span>Date & time</span>
+          <input id="transactionDateTime" type="datetime-local" required>
+        </label>
+        <label>
+          <span>Budget</span>
+          <select id="transactionBudget" required></select>
+        </label>
+        <label>
+          <span>Category</span>
+          <select id="transactionCategory" required></select>
+        </label>
+        <label>
+          <span>Notes</span>
+          <textarea id="transactionNotes" rows="3" placeholder="Optional notes"></textarea>
+        </label>
+        <label class="file-input">
+          <span>Receipt / photo</span>
+          <input id="transactionReceipt" type="file" accept="image/*">
+        </label>
+        <div class="dialog-actions">
+          <button class="soft-button" value="cancel" type="submit">Cancel</button>
+          <button type="button" id="saveTransactionButton">Save Transaction</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="budgetDialog">
+      <form id="budgetForm" method="dialog" class="dialog-form">
+        <div class="section-title">
+          <h2 id="budgetDialogTitle">Create Budget</h2>
+          <button class="icon-button ghost" value="cancel" type="submit" aria-label="Close">×</button>
+        </div>
+        <input id="budgetId" type="hidden">
+        <label>
+          <span>Budget name</span>
+          <input id="budgetName" placeholder="Travel Budget" required>
+        </label>
+        <label>
+          <span>Opening balance / budget limit</span>
+          <input id="budgetLimit" inputmode="decimal" placeholder="25000" required>
+        </label>
+        <div class="dialog-actions">
+          <button class="soft-button" value="cancel" type="submit">Cancel</button>
+          <button type="button" id="saveBudgetButton">Save Budget</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="categoryDialog">
+      <form id="categoryForm" method="dialog" class="dialog-form">
+        <div class="section-title">
+          <h2 id="categoryDialogTitle">Category</h2>
+          <button class="icon-button ghost" value="cancel" type="submit" aria-label="Close">×</button>
+        </div>
+        <input id="categoryId" type="hidden">
+        <label>
+          <span>Name</span>
+          <input id="categoryName" placeholder="Groceries" required>
+        </label>
+        <label>
+          <span>Type</span>
+          <select id="categoryType">
+            <option value="both">Income & Expense</option>
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+          </select>
+        </label>
+        <label>
+          <span>Icon</span>
+          <input id="categoryIcon" maxlength="3" placeholder="●" required>
+        </label>
+        <label>
+          <span>Color</span>
+          <input id="categoryColor" type="color" value="#176b5d">
+        </label>
+        <div class="dialog-actions">
+          <button class="soft-button" value="cancel" type="submit">Cancel</button>
+          <button type="button" id="saveCategoryButton">Save Category</button>
+        </div>
       </form>
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="loading" class="loading" hidden>Loading...</div>
     <script src="app.js" defer></script>
   </body>
 </html>

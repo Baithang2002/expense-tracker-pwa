@@ -1,7 +1,7 @@
 {
-  "name": "Rupee Expense Tracker",
-  "short_name": "Expenses",
-  "description": "Track Indian Rupee expenses, budgets, summaries, and exports.",
+  "name": "Rupee Finance Manager",
+  "short_name": "Finance",
+  "description": "Manage Indian Rupee budgets, transactions, analytics, filters, and exports.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
