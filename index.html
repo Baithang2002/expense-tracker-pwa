@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#176b5d">
-    <title>Rupee Finance Manager</title>
+    <title>Finance Manager</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -15,7 +15,7 @@
       <header class="app-header">
         <div>
           <p class="eyebrow">Personal Finance</p>
-          <h1>Rupee Finance Manager</h1>
+          <h1>Finance Manager</h1>
         </div>
         <div class="header-actions">
           <button class="icon-button" id="searchToggle" type="button" aria-label="Search transactions" title="Search">⌕</button>
@@ -26,10 +26,11 @@
       <section class="search-panel" id="searchPanel" hidden>
         <label>
           <span>Search by name, category, or amount</span>
-          <input id="globalSearch" type="search" placeholder="Search transactions">
+          <input id="globalSearch" type="search" placeholder="Search transactions…">
         </label>
       </section>
 
+      <!-- ── HOME ───────────────────────────────────────── -->
       <section class="view active" id="homeView" data-view="home">
         <div class="dashboard-grid">
           <article class="metric-card balance-card">
@@ -70,17 +71,19 @@
         </section>
       </section>
 
+      <!-- ── TRANSACTIONS ───────────────────────────────── -->
       <section class="view" id="transactionsView" data-view="transactions">
         <section class="panel">
           <div class="section-title wrap">
             <h2>Transactions</h2>
             <div class="actions">
-              <button type="button" data-open-transaction="income">Income</button>
-              <button type="button" data-open-transaction="expense">Expense</button>
+              <button type="button" data-open-transaction="income">+ Income</button>
+              <button type="button" data-open-transaction="expense">+ Expense</button>
             </div>
           </div>
 
           <div class="filter-grid">
+            <!-- Segmented type tabs span full width via CSS -->
             <div class="segmented" id="typeTabs" role="tablist" aria-label="Transaction type">
               <button type="button" data-type-filter="all" class="active">All</button>
               <button type="button" data-type-filter="income">Income</button>
@@ -97,20 +100,20 @@
               </select>
             </label>
             <label>
+              <span>Category</span>
+              <select id="categoryFilter"></select>
+            </label>
+            <label>
+              <span>Budgets</span>
+              <select id="budgetFilter" multiple size="3"></select>
+            </label>
+            <label>
               <span>From</span>
               <input id="fromDate" type="datetime-local">
             </label>
             <label>
               <span>To</span>
               <input id="toDate" type="datetime-local">
-            </label>
-            <label>
-              <span>Category</span>
-              <select id="categoryFilter"></select>
-            </label>
-            <label>
-              <span>Budgets</span>
-              <select id="budgetFilter" multiple></select>
             </label>
           </div>
 
@@ -131,6 +134,7 @@
         </section>
       </section>
 
+      <!-- ── ANALYTICS ──────────────────────────────────── -->
       <section class="view" id="analyticsView" data-view="analytics">
         <section class="panel">
           <div class="section-title">
@@ -156,7 +160,7 @@
         <section class="panel">
           <div class="section-title">
             <h2>Expense Breakdown</h2>
-            <span class="muted" id="chartHint">Long press chart for details</span>
+            <span class="muted" id="chartHint">Tap chart segment for details</span>
           </div>
           <div class="chart-layout">
             <canvas id="expenseChart" width="320" height="320" aria-label="Expense category chart"></canvas>
@@ -172,28 +176,30 @@
         </section>
       </section>
 
+      <!-- ── BUDGETS ─────────────────────────────────────── -->
       <section class="view" id="budgetsView" data-view="budgets">
         <section class="panel">
           <div class="section-title">
             <h2>Budgets</h2>
-            <button type="button" data-open-budget>Create Budget</button>
+            <button type="button" data-open-budget>+ Create Budget</button>
           </div>
           <div class="budget-grid" id="budgetCards"></div>
         </section>
       </section>
 
+      <!-- ── SETTINGS ───────────────────────────────────── -->
       <section class="view" id="settingsView" data-view="settings">
         <section class="panel">
           <div class="section-title">
             <h2>Categories</h2>
-            <button type="button" id="openCategoryButton">Add Category</button>
+            <button type="button" id="openCategoryButton">+ Add Category</button>
           </div>
           <div class="category-grid" id="categoryCards"></div>
         </section>
 
         <section class="panel">
           <div class="section-title">
-            <h2>Backup & Restore</h2>
+            <h2>Backup &amp; Restore</h2>
           </div>
           <div class="settings-grid">
             <button class="soft-button" type="button" id="backupButton">Export Backup</button>
@@ -206,7 +212,7 @@
 
         <section class="panel danger-panel">
           <h2>Reset Budget</h2>
-          <p>Clear all transactions for the selected budget. Budget and category settings will be kept.</p>
+          <p>Clear all transactions for the currently selected budget. Budget and category settings will be kept.</p>
           <button class="danger-button" type="button" id="resetBudgetButton">Reset Selected Budget</button>
         </section>
       </section>
@@ -220,24 +226,25 @@
       <button type="button" data-nav="settings">⚙<span>Settings</span></button>
     </nav>
 
+    <!-- ── TRANSACTION DIALOG ──────────────────────────── -->
     <dialog id="transactionDialog">
-      <form id="transactionForm" method="dialog" class="dialog-form">
+      <form id="transactionForm" class="dialog-form">
         <div class="section-title">
           <h2 id="transactionDialogTitle">Add Transaction</h2>
-          <button class="icon-button ghost" value="cancel" type="submit" aria-label="Close">×</button>
+          <button class="icon-button ghost" type="button" id="closeTransactionDialog" aria-label="Close">×</button>
         </div>
         <input id="transactionId" type="hidden">
         <input id="transactionType" type="hidden">
         <label>
-          <span>Amount</span>
+          <span>Amount (₹)</span>
           <input id="transactionAmount" inputmode="decimal" placeholder="1250" required>
         </label>
         <label>
           <span>Description</span>
-          <input id="transactionDescription" placeholder="Salary, groceries, train ticket" required>
+          <input id="transactionDescription" placeholder="Salary, groceries, train ticket…" required>
         </label>
         <label>
-          <span>Date & time</span>
+          <span>Date &amp; Time</span>
           <input id="transactionDateTime" type="datetime-local" required>
         </label>
         <label>
@@ -250,46 +257,48 @@
         </label>
         <label>
           <span>Notes</span>
-          <textarea id="transactionNotes" rows="3" placeholder="Optional notes"></textarea>
+          <textarea id="transactionNotes" rows="2" placeholder="Optional notes…"></textarea>
         </label>
-        <label class="file-input">
-          <span>Receipt / photo</span>
+        <label>
+          <span>Receipt / Photo</span>
           <input id="transactionReceipt" type="file" accept="image/*">
         </label>
         <div class="dialog-actions">
-          <button class="soft-button" value="cancel" type="submit">Cancel</button>
+          <button class="soft-button" type="button" id="cancelTransactionButton">Cancel</button>
           <button type="button" id="saveTransactionButton">Save Transaction</button>
         </div>
       </form>
     </dialog>
 
+    <!-- ── BUDGET DIALOG ───────────────────────────────── -->
     <dialog id="budgetDialog">
-      <form id="budgetForm" method="dialog" class="dialog-form">
+      <form id="budgetForm" class="dialog-form">
         <div class="section-title">
           <h2 id="budgetDialogTitle">Create Budget</h2>
-          <button class="icon-button ghost" value="cancel" type="submit" aria-label="Close">×</button>
+          <button class="icon-button ghost" type="button" id="closeBudgetDialog" aria-label="Close">×</button>
         </div>
         <input id="budgetId" type="hidden">
         <label>
-          <span>Budget name</span>
+          <span>Budget Name</span>
           <input id="budgetName" placeholder="Travel Budget" required>
         </label>
         <label>
-          <span>Opening balance / budget limit</span>
+          <span>Opening Balance / Budget Limit</span>
           <input id="budgetLimit" inputmode="decimal" placeholder="25000" required>
         </label>
         <div class="dialog-actions">
-          <button class="soft-button" value="cancel" type="submit">Cancel</button>
+          <button class="soft-button" type="button" id="cancelBudgetButton">Cancel</button>
           <button type="button" id="saveBudgetButton">Save Budget</button>
         </div>
       </form>
     </dialog>
 
+    <!-- ── CATEGORY DIALOG ────────────────────────────── -->
     <dialog id="categoryDialog">
-      <form id="categoryForm" method="dialog" class="dialog-form">
+      <form id="categoryForm" class="dialog-form">
         <div class="section-title">
           <h2 id="categoryDialogTitle">Category</h2>
-          <button class="icon-button ghost" value="cancel" type="submit" aria-label="Close">×</button>
+          <button class="icon-button ghost" type="button" id="closeCategoryDialog" aria-label="Close">×</button>
         </div>
         <input id="categoryId" type="hidden">
         <label>
@@ -299,28 +308,28 @@
         <label>
           <span>Type</span>
           <select id="categoryType">
-            <option value="both">Income & Expense</option>
-            <option value="income">Income</option>
-            <option value="expense">Expense</option>
+            <option value="both">Income &amp; Expense</option>
+            <option value="income">Income Only</option>
+            <option value="expense">Expense Only</option>
           </select>
         </label>
         <label>
-          <span>Icon</span>
+          <span>Icon (emoji or symbol)</span>
           <input id="categoryIcon" maxlength="3" placeholder="●" required>
         </label>
         <label>
           <span>Color</span>
-          <input id="categoryColor" type="color" value="#176b5d">
+          <input id="categoryColor" type="color" value="#176b5d" style="min-height:52px;padding:6px;">
         </label>
         <div class="dialog-actions">
-          <button class="soft-button" value="cancel" type="submit">Cancel</button>
+          <button class="soft-button" type="button" id="cancelCategoryButton">Cancel</button>
           <button type="button" id="saveCategoryButton">Save Category</button>
         </div>
       </form>
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <div id="loading" class="loading" hidden>Loading...</div>
+    <div id="loading" class="loading" hidden>Saving…</div>
     <script src="app.js" defer></script>
   </body>
 </html>

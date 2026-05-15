@@ -13,6 +13,8 @@
   --expense: #c53f3f;
   --warning: #a76500;
   --shadow: 0 14px 36px rgba(23, 54, 48, 0.11);
+  --radius-card: 22px;
+  --radius-inner: 14px;
 }
 
 * {
@@ -38,17 +40,22 @@ textarea {
   font: inherit;
 }
 
+/* ── Buttons ─────────────────────────────────────────── */
 button,
 .file-button {
   min-height: 44px;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-inner);
   background: var(--primary);
   color: #ffffff;
   padding: 10px 16px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
   transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+button:hover {
+  background: var(--primary-dark);
 }
 
 button:active,
@@ -61,53 +68,64 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 .file-button:focus-within {
-  outline: 3px solid rgba(23, 107, 93, 0.28);
+  outline: 3px solid rgba(23, 107, 93, 0.35);
   outline-offset: 2px;
 }
 
+/* ── Form controls ───────────────────────────────────── */
 input,
 select,
 textarea {
   width: 100%;
   min-height: 46px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-inner);
   background: #fbfdfc;
   color: var(--ink);
   padding: 11px 13px;
+  transition: border-color 140ms ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--primary);
+  outline: none;
 }
 
 textarea {
   resize: vertical;
+  min-height: 80px;
 }
 
 label span {
   display: block;
   margin: 0 0 7px;
   color: var(--muted);
-  font-size: 0.83rem;
-  font-weight: 800;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
 }
 
-h1,
-h2,
-p {
-  margin: 0;
-}
+h1, h2, p { margin: 0; }
 
 h1 {
-  font-size: clamp(1.75rem, 6vw, 3.1rem);
+  font-size: clamp(1.65rem, 6vw, 3rem);
   line-height: 1.02;
+  font-weight: 900;
 }
 
 h2 {
-  font-size: 1.18rem;
+  font-size: 1.1rem;
+  font-weight: 800;
 }
 
+/* ── App shell ───────────────────────────────────────── */
 .app-shell {
   width: min(1180px, 100%);
   margin: 0 auto;
-  padding: 18px 18px 92px;
+  padding: 18px 18px 96px;
 }
 
 .app-header,
@@ -118,7 +136,7 @@ h2 {
 .dialog-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .app-header,
@@ -127,15 +145,15 @@ h2 {
 }
 
 .app-header {
-  padding: 10px 0 18px;
+  padding: 10px 0 20px;
 }
 
 .eyebrow {
   margin-bottom: 5px;
   color: var(--primary-dark);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 900;
-  letter-spacing: 0;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -147,12 +165,17 @@ h2 {
   place-items: center;
   border-radius: 50%;
   padding: 0;
-  font-size: 1.5rem;
+  font-size: 1.4rem;
+  flex-shrink: 0;
 }
 
 .ghost {
-  background: transparent;
+  background: transparent !important;
   color: var(--ink);
+}
+
+.ghost:hover {
+  background: var(--primary-soft) !important;
 }
 
 .soft-button,
@@ -161,15 +184,24 @@ h2 {
   color: var(--primary-dark);
 }
 
+.soft-button:hover {
+  background: #cde5dd;
+}
+
 .danger-button {
   background: var(--expense);
 }
 
+.danger-button:hover {
+  background: #a83333;
+}
+
+/* ── Panels & cards ──────────────────────────────────── */
 .search-panel,
 .panel,
 .metric-card {
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -179,9 +211,10 @@ h2 {
   padding: 14px;
 }
 
+/* ── Views ───────────────────────────────────────────── */
 .view {
   display: none;
-  animation: fadeIn 180ms ease;
+  animation: fadeIn 200ms ease;
 }
 
 .view.active {
@@ -189,56 +222,51 @@ h2 {
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Dashboard grid ──────────────────────────────────── */
 .dashboard-grid,
 .analytics-grid {
   display: grid;
   grid-template-columns: 1.15fr 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
   margin-bottom: 14px;
 }
 
 .metric-card {
   min-width: 0;
-  padding: 18px;
+  padding: 18px 16px;
 }
 
 .metric-card span {
   display: block;
   color: var(--muted);
-  font-size: 0.84rem;
-  font-weight: 800;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .metric-card strong {
   display: block;
-  margin-top: 9px;
+  margin-top: 8px;
   overflow-wrap: anywhere;
-  font-size: clamp(1.4rem, 4vw, 2.35rem);
-  line-height: 1.05;
+  font-size: clamp(1.25rem, 3.5vw, 2.2rem);
+  line-height: 1.06;
+  font-weight: 900;
 }
 
 .balance-card {
-  border-color: rgba(23, 107, 93, 0.28);
+  border-color: rgba(23, 107, 93, 0.3);
+  background: linear-gradient(135deg, #f0faf6 0%, #fff 100%);
 }
 
-.income-text {
-  color: var(--income);
-}
+.income-text  { color: var(--income); }
+.expense-text { color: var(--expense); }
 
-.expense-text {
-  color: var(--expense);
-}
-
+/* ── Quick actions ───────────────────────────────────── */
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -246,18 +274,23 @@ h2 {
   margin-bottom: 14px;
 }
 
+/* ── Panel spacing ───────────────────────────────────── */
 .panel {
   margin-bottom: 14px;
-  padding: 16px;
+  padding: 18px;
 }
 
-.wrap {
+.section-title {
+  margin-bottom: 14px;
   flex-wrap: wrap;
+  row-gap: 8px;
 }
 
+.wrap { flex-wrap: wrap; }
+
+/* ── Budget overview ─────────────────────────────────── */
 .budget-overview,
-.budget-grid,
-.category-grid {
+.budget-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
@@ -269,35 +302,36 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface-2);
+  transition: border-color 160ms ease;
 }
 
 .budget-card {
-  padding: 14px;
+  padding: 16px;
 }
 
 .budget-card.active {
   border-color: var(--primary);
-  box-shadow: inset 0 0 0 1px var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary), 0 0 0 3px rgba(23, 107, 93, 0.08);
 }
 
-.budget-card header,
-.transaction-card header,
-.category-card header {
+.budget-card header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  margin-bottom: 2px;
 }
 
 .budget-card h3,
 .transaction-card h3,
 .category-card h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.97rem;
+  font-weight: 700;
 }
 
 .progress {
-  height: 8px;
+  height: 7px;
   margin: 12px 0 8px;
   overflow: hidden;
   border-radius: 999px;
@@ -309,18 +343,26 @@ h2 {
   height: 100%;
   border-radius: inherit;
   background: var(--primary);
+  transition: width 400ms ease;
 }
 
 .muted {
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
+/* ── Transactions: filters ───────────────────────────── */
 .filter-grid {
   display: grid;
-  grid-template-columns: 1.3fr repeat(5, 1fr);
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
   align-items: end;
+}
+
+/* Segmented control spans full row on its own */
+.filter-grid .segmented {
+  grid-column: 1 / -1;
 }
 
 .segmented {
@@ -329,6 +371,7 @@ h2 {
   border-radius: 16px;
   background: var(--primary-soft);
   padding: 4px;
+  gap: 2px;
 }
 
 .segmented button {
@@ -336,25 +379,44 @@ h2 {
   border-radius: 12px;
   background: transparent;
   color: var(--primary-dark);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.segmented button:hover {
+  background: rgba(23, 107, 93, 0.12);
 }
 
 .segmented button.active {
   background: var(--primary);
   color: #ffffff;
+  box-shadow: 0 2px 8px rgba(23, 107, 93, 0.25);
+}
+
+/* Budget multi-select: make it more usable */
+#budgetFilter {
+  min-height: 80px;
 }
 
 .export-row {
   justify-content: flex-end;
   flex-wrap: wrap;
+  gap: 8px;
   margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
+/* ── Transaction list ────────────────────────────────── */
 .transaction-list {
   display: grid;
-  max-height: 58vh;
+  gap: 8px;
+  max-height: 64vh;
   overflow: auto;
-  gap: 10px;
   padding-right: 2px;
+  /* custom scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
 
 .transaction-list.compact {
@@ -364,19 +426,26 @@ h2 {
 .transaction-card {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  align-items: center;
+  align-items: start;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 14px;
+  transition: background 140ms ease;
+}
+
+.transaction-card:hover {
+  background: var(--surface);
 }
 
 .category-icon {
   display: grid;
   width: 44px;
   height: 44px;
+  min-width: 44px;
   place-items: center;
-  border-radius: 14px;
+  border-radius: 13px;
   color: #ffffff;
   font-weight: 900;
+  font-size: 1rem;
 }
 
 .transaction-main {
@@ -387,38 +456,40 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .transaction-meta,
 .tag-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 7px;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
+  min-height: 22px;
   border-radius: 999px;
   background: var(--primary-soft);
   color: var(--primary-dark);
-  padding: 3px 9px;
-  font-size: 0.76rem;
-  font-weight: 800;
+  padding: 2px 9px;
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .amount {
-  font-size: 1.05rem;
-  font-weight: 900;
+  font-size: 1rem;
+  font-weight: 800;
   text-align: right;
   white-space: nowrap;
+  padding-top: 2px;
 }
 
 .transaction-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 6px;
   margin-top: 8px;
 }
@@ -426,10 +497,11 @@ h2 {
 .transaction-actions button,
 .budget-card footer button,
 .category-card footer button {
-  min-height: 34px;
-  border-radius: 10px;
-  padding: 7px 10px;
-  font-size: 0.82rem;
+  min-height: 32px;
+  border-radius: 9px;
+  padding: 6px 11px;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .delete-button {
@@ -438,34 +510,44 @@ h2 {
   color: var(--expense);
 }
 
+.delete-button:hover {
+  background: #fde0e0;
+}
+
 .edit-button {
   background: var(--primary-soft);
   color: var(--primary-dark);
 }
 
+.edit-button:hover {
+  background: #cde5dd;
+}
+
+/* ── Analytics ───────────────────────────────────────── */
 .chart-layout {
   display: grid;
-  grid-template-columns: minmax(240px, 340px) 1fr;
-  gap: 18px;
-  align-items: center;
+  grid-template-columns: minmax(0, 300px) 1fr;
+  gap: 24px;
+  align-items: start;
 }
 
 canvas {
   width: 100%;
-  max-width: 340px;
+  max-width: 300px;
   aspect-ratio: 1;
+  display: block;
 }
 
 .category-breakdown,
 .bars {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .breakdown-row,
 .bar-row {
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .breakdown-line,
@@ -473,11 +555,12 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+  font-size: 0.88rem;
 }
 
 .bar-track {
-  height: 9px;
+  height: 8px;
   overflow: hidden;
   border-radius: 999px;
   background: #dfeae7;
@@ -490,18 +573,45 @@ canvas {
   background: var(--primary);
 }
 
+/* ── Categories (Settings) ───────────────────────────── */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
 .category-card {
-  padding: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.category-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .category-card footer,
 .budget-card footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 7px;
+  margin-top: auto;
+  padding-top: 4px;
 }
 
+.category-card .category-icon {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* ── Settings ────────────────────────────────────────── */
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -512,24 +622,31 @@ canvas {
   display: grid;
   place-items: center;
   text-align: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .file-button input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: 100%;
+  height: 100%;
   opacity: 0;
+  cursor: pointer;
 }
 
 .danger-panel {
   border-color: rgba(197, 63, 63, 0.22);
+  background: #fffafa;
 }
 
 .danger-panel p {
-  margin: 8px 0 14px;
+  margin: 8px 0 16px;
   color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
+/* ── Bottom nav ──────────────────────────────────────── */
 .bottom-nav {
   position: fixed;
   right: 0;
@@ -541,54 +658,73 @@ canvas {
   gap: 4px;
   border-top: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.94);
-  padding: 8px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .bottom-nav button {
-  min-height: 54px;
-  border-radius: 16px;
+  min-height: 52px;
+  border-radius: 14px;
   background: transparent;
   color: var(--muted);
   padding: 6px 4px;
   font-size: 1.1rem;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.bottom-nav button:hover {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
 }
 
 .bottom-nav button.active {
   background: var(--primary-soft);
   color: var(--primary-dark);
+  font-weight: 800;
 }
 
 .bottom-nav span {
   display: block;
   margin-top: 2px;
-  font-size: 0.68rem;
-  font-weight: 900;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
+/* ── Dialog ──────────────────────────────────────────── */
 dialog {
   width: min(520px, calc(100% - 26px));
+  max-height: calc(100dvh - 40px);
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 24px;
   padding: 0;
   color: var(--ink);
-  box-shadow: 0 24px 80px rgba(14, 31, 27, 0.25);
+  box-shadow: 0 24px 80px rgba(14, 31, 27, 0.28);
+  overflow: hidden;
 }
 
 dialog::backdrop {
-  background: rgba(14, 31, 27, 0.42);
+  background: rgba(14, 31, 27, 0.45);
+  backdrop-filter: blur(2px);
 }
 
 .dialog-form {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 14px;
+  padding: 18px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
 
 .dialog-actions {
   justify-content: flex-end;
+  padding-top: 4px;
 }
 
+/* ── Toast / Loading ─────────────────────────────────── */
 .toast,
 .loading {
   position: fixed;
@@ -596,18 +732,20 @@ dialog::backdrop {
   right: 16px;
   bottom: 88px;
   max-width: min(380px, calc(100% - 32px));
-  border-radius: 16px;
+  border-radius: 14px;
   background: #13221f;
   color: #ffffff;
-  padding: 12px 14px;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
 }
 
 .toast {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(12px);
-  transition: opacity 160ms ease, transform 160ms ease;
+  transform: translateY(10px);
+  transition: opacity 180ms ease, transform 180ms ease;
 }
 
 .toast.show {
@@ -622,19 +760,52 @@ dialog::backdrop {
   transform: translate(-50%, 50%);
 }
 
+/* ── Responsive: tablet ──────────────────────────────── */
 @media (max-width: 980px) {
-  .dashboard-grid,
-  .analytics-grid,
-  .quick-actions,
-  .filter-grid,
+  .dashboard-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dashboard-grid .balance-card {
+    grid-column: 1 / -1;
+  }
+
+  .analytics-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .quick-actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filter-grid .segmented {
+    grid-column: 1 / -1;
+  }
+
   .chart-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 280px) 1fr;
   }
 }
 
+@media (max-width: 720px) {
+  .chart-layout {
+    grid-template-columns: 1fr;
+  }
+
+  canvas {
+    max-width: 260px;
+    margin: 0 auto;
+  }
+}
+
+/* ── Responsive: mobile ──────────────────────────────── */
 @media (max-width: 680px) {
   .app-shell {
-    padding: 16px 12px 92px;
+    padding: 14px 12px 96px;
   }
 
   .app-header {
@@ -642,45 +813,111 @@ dialog::backdrop {
   }
 
   .panel,
-  .metric-card,
   .search-panel {
     border-radius: 20px;
     padding: 14px;
   }
 
-  .section-title {
-    align-items: stretch;
-    flex-direction: column;
+  .metric-card {
+    border-radius: 18px;
+    padding: 14px;
   }
 
-  .actions,
-  .export-row,
-  .dialog-actions,
-  .settings-grid {
-    display: grid;
+  .dashboard-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .analytics-grid {
     grid-template-columns: 1fr;
   }
 
+  .quick-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-grid .segmented {
+    grid-column: 1;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .export-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .export-row #clearFilters {
+    grid-column: 1 / -1;
+  }
+
+  .dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Transaction cards: stack amount below */
   .transaction-card {
     grid-template-columns: auto 1fr;
+    row-gap: 4px;
   }
 
   .amount {
-    grid-column: 1 / -1;
-    text-align: left;
+    grid-column: 2;
+    text-align: right;
+    font-size: 0.95rem;
   }
 
   .transaction-actions {
-    justify-content: stretch;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .transaction-actions button {
     flex: 1;
+    min-width: 64px;
   }
 
   .budget-overview,
   .budget-grid,
   .category-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #budgetFilter {
+    min-height: 90px;
+  }
+
+  .section-title {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .section-title h2 {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 400px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-actions {
     grid-template-columns: 1fr;
   }
 }

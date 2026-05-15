@@ -1,7 +1,7 @@
 {
-  "name": "Rupee Finance Manager",
+  "name": "Finance Manager",
   "short_name": "Finance",
-  "description": "Manage Indian Rupee budgets, transactions, analytics, filters, and exports.",
+  "description": "Manage budgets, transactions, analytics, filters, and exports.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

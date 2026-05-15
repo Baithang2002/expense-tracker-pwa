@@ -1,5 +1,5 @@
-const STORAGE_KEY = "rupee-finance-manager-v1";
-const LEGACY_KEY = "rupee-expense-tracker-state-v1";
+const STORAGE_KEY = "finance-manager-v1";
+const LEGACY_KEY = "expense-tracker-state-v1";
 
 const INR = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -108,10 +108,76 @@ let filters = {
   search: "",
 };
 
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
 function uid(prefix) {
-  const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const id = crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return `${prefix}-${id}`;
 }
+
+function roundMoney(amount) {
+  return Math.round((Number(amount) + Number.EPSILON) * 100) / 100;
+}
+
+function parseAmount(value) {
+  return Number(String(value).replace(/[₹,\s]/g, ""));
+}
+
+function formatINR(amount) {
+  return INR.format(roundMoney(amount));
+}
+
+function exportAmount(amount) {
+  return `INR ${roundMoney(amount).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function nowLocalInput() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+function formatDateTime(value) {
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  }[c]));
+}
+
+function sum(values) {
+  return roundMoney(values.reduce((t, v) => t + v, 0));
+}
+
+function chunk(items, size) {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out.length ? out : [[]];
+}
+
+function showEarlyError(message) {
+  window.setTimeout(() => showToast(message), 0);
+}
+
+// ── State persistence ──────────────────────────────────────────────────────────
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -128,43 +194,50 @@ function loadState() {
   return migrateLegacyState() || createInitialState();
 }
 
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
 function normalizeState(input) {
   const budgets = input.budgets.length ? input.budgets : defaultBudgets();
-  const categories = input.categories && input.categories.length ? input.categories : defaultCategories();
-  const activeBudgetId = budgets.some((budget) => budget.id === input.activeBudgetId) ? input.activeBudgetId : budgets[0].id;
+  const categories =
+    input.categories && input.categories.length ? input.categories : defaultCategories();
+  const activeBudgetId = budgets.some((b) => b.id === input.activeBudgetId)
+    ? input.activeBudgetId
+    : budgets[0].id;
   return {
     activeBudgetId,
-    budgets: budgets.map((budget) => ({
-      id: budget.id || uid("budget"),
-      name: budget.name || "Budget",
-      limit: roundMoney(Number(budget.limit) || 0),
-      archived: Boolean(budget.archived),
+    budgets: budgets.map((b) => ({
+      id: b.id || uid("budget"),
+      name: b.name || "Budget",
+      limit: roundMoney(Number(b.limit) || 0),
+      archived: Boolean(b.archived),
     })),
-    categories: categories.map((category) => ({
-      id: category.id || uid("category"),
-      name: category.name || "Category",
-      type: category.type || "both",
-      icon: category.icon || "●",
-      color: category.color || "#176b5d",
+    categories: categories.map((c) => ({
+      id: c.id || uid("category"),
+      name: c.name || "Category",
+      type: c.type || "both",
+      icon: c.icon || "●",
+      color: c.color || "#176b5d",
     })),
     transactions: (input.transactions || []).map(normalizeTransaction).filter(Boolean),
   };
 }
 
-function normalizeTransaction(transaction) {
-  const amount = Number(transaction.amount);
-  if (!transaction.description || !Number.isFinite(amount) || amount <= 0) return null;
+function normalizeTransaction(t) {
+  const amount = Number(t.amount);
+  if (!t.description || !Number.isFinite(amount) || amount <= 0) return null;
   return {
-    id: transaction.id || uid("tx"),
-    type: transaction.type === "income" ? "income" : "expense",
+    id: t.id || uid("tx"),
+    type: t.type === "income" ? "income" : "expense",
     amount: roundMoney(amount),
-    description: String(transaction.description),
-    dateTime: transaction.dateTime || `${transaction.purchaseDate || todayDate()}T12:00`,
-    categoryId: transaction.categoryId || (transaction.type === "income" ? "salary" : "others"),
-    budgetId: transaction.budgetId || "personal",
-    notes: transaction.notes || "",
-    receiptName: transaction.receiptName || "",
-    receiptData: transaction.receiptData || "",
+    description: String(t.description),
+    dateTime: t.dateTime || `${t.purchaseDate || todayDate()}T12:00`,
+    categoryId: t.categoryId || (t.type === "income" ? "salary" : "others"),
+    budgetId: t.budgetId || "personal",
+    notes: t.notes || "",
+    receiptName: t.receiptName || "",
+    receiptData: t.receiptData || "",
   };
 }
 
@@ -175,18 +248,20 @@ function migrateLegacyState() {
     const parsed = JSON.parse(legacy);
     const initial = createInitialState();
     initial.budgets[0].limit = Number(parsed.budget) || 0;
-    initial.transactions = (parsed.expenses || []).map((expense) => ({
-      id: uid("tx"),
-      type: "expense",
-      amount: roundMoney(Number(expense.amount) || 0),
-      description: expense.description || "Expense",
-      dateTime: `${expense.purchase_date || expense.purchaseDate || todayDate()}T12:00`,
-      categoryId: "others",
-      budgetId: "personal",
-      notes: "",
-      receiptName: "",
-      receiptData: "",
-    })).filter((transaction) => transaction.amount > 0);
+    initial.transactions = (parsed.expenses || [])
+      .map((e) => ({
+        id: uid("tx"),
+        type: "expense",
+        amount: roundMoney(Number(e.amount) || 0),
+        description: e.description || "Expense",
+        dateTime: `${e.purchase_date || e.purchaseDate || todayDate()}T12:00`,
+        categoryId: "others",
+        budgetId: "personal",
+        notes: "",
+        receiptName: "",
+        receiptData: "",
+      }))
+      .filter((t) => t.amount > 0);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
     return initial;
   } catch {
@@ -208,66 +283,37 @@ function defaultBudgets() {
 }
 
 function defaultCategories() {
-  return DEFAULT_CATEGORIES.map(([id, name, type, icon, color]) => ({ id, name, type, icon, color }));
+  return DEFAULT_CATEGORIES.map(([id, name, type, icon, color]) => ({
+    id, name, type, icon, color,
+  }));
 }
 
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-
-function showEarlyError(message) {
-  window.setTimeout(() => showToast(message), 0);
-}
+// ── Lookups ────────────────────────────────────────────────────────────────────
 
 function getBudget(id) {
-  return state.budgets.find((budget) => budget.id === id) || state.budgets[0];
+  return (
+    state.budgets.find((b) => b.id === id) || state.budgets[0]
+  );
 }
 
 function getCategory(id) {
-  return state.categories.find((category) => category.id === id) || state.categories.find((category) => category.id === "others") || state.categories[0];
+  return (
+    state.categories.find((c) => c.id === id) ||
+    state.categories.find((c) => c.id === "others") ||
+    state.categories[0]
+  );
 }
 
 function activeBudget() {
   return getBudget(state.activeBudgetId);
 }
 
-function parseAmount(value) {
-  return Number(String(value).replace(/[₹,\s]/g, ""));
-}
-
-function roundMoney(amount) {
-  return Math.round((Number(amount) + Number.EPSILON) * 100) / 100;
-}
-
-function formatINR(amount) {
-  return INR.format(roundMoney(amount));
-}
-
-function exportAmount(amount) {
-  return `INR ${roundMoney(amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function todayDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function nowLocalInput() {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 16);
-}
-
-function formatDateTime(value) {
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
+// ── Calculations ───────────────────────────────────────────────────────────────
 
 function calculateBudgetTotals(budgetId) {
-  const transactions = state.transactions.filter((transaction) => transaction.budgetId === budgetId);
-  const income = sum(transactions.filter((transaction) => transaction.type === "income").map((transaction) => transaction.amount));
-  const expenses = sum(transactions.filter((transaction) => transaction.type === "expense").map((transaction) => transaction.amount));
+  const txs = state.transactions.filter((t) => t.budgetId === budgetId);
+  const income = sum(txs.filter((t) => t.type === "income").map((t) => t.amount));
+  const expenses = sum(txs.filter((t) => t.type === "expense").map((t) => t.amount));
   const budget = getBudget(budgetId);
   return {
     income,
@@ -278,9 +324,9 @@ function calculateBudgetTotals(budgetId) {
 }
 
 function calculateGlobalTotals(transactions = state.transactions) {
-  const income = sum(transactions.filter((transaction) => transaction.type === "income").map((transaction) => transaction.amount));
-  const expenses = sum(transactions.filter((transaction) => transaction.type === "expense").map((transaction) => transaction.amount));
-  const limits = sum(state.budgets.filter((budget) => !budget.archived).map((budget) => budget.limit));
+  const income = sum(transactions.filter((t) => t.type === "income").map((t) => t.amount));
+  const expenses = sum(transactions.filter((t) => t.type === "expense").map((t) => t.amount));
+  const limits = sum(state.budgets.filter((b) => !b.archived).map((b) => b.limit));
   return {
     income,
     expenses,
@@ -288,16 +334,30 @@ function calculateGlobalTotals(transactions = state.transactions) {
   };
 }
 
-function sum(values) {
-  return roundMoney(values.reduce((total, value) => total + value, 0));
+// ── Data mutations ─────────────────────────────────────────────────────────────
+
+function sortTransactions() {
+  state.transactions.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+}
+
+function validateTransaction(t) {
+  if (!t.description.trim()) throw new Error("Enter a transaction description.");
+  if (!Number.isFinite(t.amount) || t.amount <= 0) throw new Error("Enter a valid amount.");
+  if (!t.dateTime) throw new Error("Choose date and time.");
+  if (!t.categoryId) throw new Error("Choose a category.");
+  if (!t.budgetId) throw new Error("Choose a budget.");
 }
 
 function addOrUpdateTransaction(payload) {
   validateTransaction(payload);
   if (payload.id) {
-    const index = state.transactions.findIndex((transaction) => transaction.id === payload.id);
+    const index = state.transactions.findIndex((t) => t.id === payload.id);
     if (index === -1) throw new Error("Transaction not found.");
-    state.transactions[index] = { ...state.transactions[index], ...payload, amount: roundMoney(payload.amount) };
+    state.transactions[index] = {
+      ...state.transactions[index],
+      ...payload,
+      amount: roundMoney(payload.amount),
+    };
   } else {
     state.transactions.push({ ...payload, id: uid("tx"), amount: roundMoney(payload.amount) });
   }
@@ -305,18 +365,10 @@ function addOrUpdateTransaction(payload) {
   saveState();
 }
 
-function validateTransaction(transaction) {
-  if (!transaction.description.trim()) throw new Error("Enter a transaction description.");
-  if (!Number.isFinite(transaction.amount) || transaction.amount <= 0) throw new Error("Enter a valid amount.");
-  if (!transaction.dateTime) throw new Error("Choose date and time.");
-  if (!transaction.categoryId) throw new Error("Choose a category.");
-  if (!transaction.budgetId) throw new Error("Choose a budget.");
-}
-
 function deleteTransaction(id) {
-  const transaction = state.transactions.find((item) => item.id === id);
-  if (!transaction) return;
-  if (!confirm(`Delete this transaction?\n\n${transaction.description} - ${formatINR(transaction.amount)}`)) return;
+  const t = state.transactions.find((item) => item.id === id);
+  if (!t) return;
+  if (!confirm(`Delete this transaction?\n\n${t.description} — ${formatINR(t.amount)}`)) return;
   state.transactions = state.transactions.filter((item) => item.id !== id);
   saveState();
   render();
@@ -325,13 +377,19 @@ function deleteTransaction(id) {
 
 function addOrUpdateBudget(payload) {
   if (!payload.name.trim()) throw new Error("Enter a budget name.");
-  if (!Number.isFinite(payload.limit) || payload.limit < 0) throw new Error("Enter a valid budget amount.");
+  if (!Number.isFinite(payload.limit) || payload.limit < 0)
+    throw new Error("Enter a valid budget amount.");
   if (payload.id) {
     const budget = getBudget(payload.id);
     budget.name = payload.name.trim();
     budget.limit = roundMoney(payload.limit);
   } else {
-    const budget = { id: uid("budget"), name: payload.name.trim(), limit: roundMoney(payload.limit), archived: false };
+    const budget = {
+      id: uid("budget"),
+      name: payload.name.trim(),
+      limit: roundMoney(payload.limit),
+      archived: false,
+    };
     state.budgets.push(budget);
     state.activeBudgetId = budget.id;
   }
@@ -344,9 +402,12 @@ function deleteBudget(id) {
     return;
   }
   const budget = getBudget(id);
-  if (!confirm(`Delete ${budget.name} and all its transactions? This cannot be undone.`)) return;
-  state.budgets = state.budgets.filter((item) => item.id !== id);
-  state.transactions = state.transactions.filter((transaction) => transaction.budgetId !== id);
+  if (
+    !confirm(`Delete "${budget.name}" and all its transactions? This cannot be undone.`)
+  )
+    return;
+  state.budgets = state.budgets.filter((b) => b.id !== id);
+  state.transactions = state.transactions.filter((t) => t.budgetId !== id);
   if (state.activeBudgetId === id) state.activeBudgetId = state.budgets[0].id;
   saveState();
   render();
@@ -355,8 +416,13 @@ function deleteBudget(id) {
 
 function resetActiveBudget() {
   const budget = activeBudget();
-  if (!confirm(`Reset ${budget.name}?\n\nThis will clear all transactions for this budget. This cannot be undone.`)) return;
-  state.transactions = state.transactions.filter((transaction) => transaction.budgetId !== budget.id);
+  if (
+    !confirm(
+      `Reset "${budget.name}"?\n\nThis will clear all transactions for this budget. This cannot be undone.`
+    )
+  )
+    return;
+  state.transactions = state.transactions.filter((t) => t.budgetId !== budget.id);
   saveState();
   render();
   showToast("Budget transactions cleared");
@@ -365,11 +431,11 @@ function resetActiveBudget() {
 function addOrUpdateCategory(payload) {
   if (!payload.name.trim()) throw new Error("Enter a category name.");
   if (payload.id) {
-    const category = getCategory(payload.id);
-    category.name = payload.name.trim();
-    category.type = payload.type;
-    category.icon = payload.icon.trim() || "●";
-    category.color = payload.color;
+    const cat = getCategory(payload.id);
+    cat.name = payload.name.trim();
+    cat.type = payload.type;
+    cat.icon = payload.icon.trim() || "●";
+    cat.color = payload.color;
   } else {
     state.categories.push({
       id: uid("category"),
@@ -387,41 +453,40 @@ function deleteCategory(id) {
     showToast("At least one category is required");
     return;
   }
-  const category = getCategory(id);
-  if (!confirm(`Delete category ${category.name}? Transactions will move to Others.`)) return;
-  const fallback = state.categories.find((item) => item.id === "others") || state.categories.find((item) => item.id !== id);
-  state.transactions.forEach((transaction) => {
-    if (transaction.categoryId === id) transaction.categoryId = fallback.id;
+  const cat = getCategory(id);
+  if (!confirm(`Delete category "${cat.name}"? Transactions will move to Others.`)) return;
+  const fallback =
+    state.categories.find((c) => c.id === "others") ||
+    state.categories.find((c) => c.id !== id);
+  state.transactions.forEach((t) => {
+    if (t.categoryId === id) t.categoryId = fallback.id;
   });
-  state.categories = state.categories.filter((item) => item.id !== id);
+  state.categories = state.categories.filter((c) => c.id !== id);
   saveState();
   render();
   showToast("Category deleted");
 }
 
-function sortTransactions() {
-  state.transactions.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
-}
+// ── Filtering ──────────────────────────────────────────────────────────────────
 
 function getFilteredTransactions() {
-  let output = [...state.transactions];
-  if (filters.type !== "all") output = output.filter((transaction) => transaction.type === filters.type);
-  if (filters.categoryId !== "all") output = output.filter((transaction) => transaction.categoryId === filters.categoryId);
-  if (filters.budgetIds.length) output = output.filter((transaction) => filters.budgetIds.includes(transaction.budgetId));
+  let out = [...state.transactions];
+  if (filters.type !== "all") out = out.filter((t) => t.type === filters.type);
+  if (filters.categoryId !== "all") out = out.filter((t) => t.categoryId === filters.categoryId);
+  if (filters.budgetIds.length) out = out.filter((t) => filters.budgetIds.includes(t.budgetId));
   if (filters.search.trim()) {
-    const query = filters.search.trim().toLowerCase();
-    output = output.filter((transaction) => {
-      const category = getCategory(transaction.categoryId);
+    const q = filters.search.trim().toLowerCase();
+    out = out.filter((t) => {
+      const cat = getCategory(t.categoryId);
       return [
-        transaction.description,
-        category.name,
-        getBudget(transaction.budgetId).name,
-        String(transaction.amount),
-        transaction.notes,
-      ].some((value) => String(value).toLowerCase().includes(query));
+        t.description,
+        cat.name,
+        getBudget(t.budgetId).name,
+        String(t.amount),
+        t.notes,
+      ].some((v) => String(v).toLowerCase().includes(q));
     });
   }
-
   const now = new Date();
   if (filters.quick !== "all") {
     let start;
@@ -431,12 +496,14 @@ function getFilteredTransactions() {
       start = new Date(now);
       start.setDate(start.getDate() - Number(filters.quick));
     }
-    output = output.filter((transaction) => new Date(transaction.dateTime) >= start);
+    out = out.filter((t) => new Date(t.dateTime) >= start);
   }
-  if (filters.from) output = output.filter((transaction) => new Date(transaction.dateTime) >= new Date(filters.from));
-  if (filters.to) output = output.filter((transaction) => new Date(transaction.dateTime) <= new Date(filters.to));
-  return output.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+  if (filters.from) out = out.filter((t) => new Date(t.dateTime) >= new Date(filters.from));
+  if (filters.to) out = out.filter((t) => new Date(t.dateTime) <= new Date(filters.to));
+  return out.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
 }
+
+// ── Render ─────────────────────────────────────────────────────────────────────
 
 function render() {
   renderSelectors();
@@ -448,28 +515,41 @@ function render() {
 }
 
 function renderSelectors() {
-  const budgetOptions = state.budgets.map((budget) => `<option value="${budget.id}">${escapeHtml(budget.name)}</option>`).join("");
+  const budgetOptions = state.budgets
+    .map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`)
+    .join("");
+
   elements.activeBudgetSelect.innerHTML = budgetOptions;
   elements.activeBudgetSelect.value = state.activeBudgetId;
+
   elements.transactionBudget.innerHTML = budgetOptions;
   elements.transactionBudget.value = state.activeBudgetId;
-  elements.budgetFilter.innerHTML = state.budgets.map((budget) => `<option value="${budget.id}">${escapeHtml(budget.name)}</option>`).join("");
-  [...elements.budgetFilter.options].forEach((option) => {
-    option.selected = filters.budgetIds.includes(option.value);
+
+  elements.budgetFilter.innerHTML = state.budgets
+    .map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`)
+    .join("");
+  [...elements.budgetFilter.options].forEach((o) => {
+    o.selected = filters.budgetIds.includes(o.value);
   });
+
   elements.analyticsBudgetSelect.innerHTML = `<option value="all">All Budgets</option>${budgetOptions}`;
   elements.analyticsBudgetSelect.value = analyticsBudgetId;
-  elements.categoryFilter.innerHTML = `<option value="all">All Categories</option>${state.categories.map((category) => `<option value="${category.id}">${escapeHtml(category.name)}</option>`).join("")}`;
+
+  elements.categoryFilter.innerHTML =
+    `<option value="all">All Categories</option>` +
+    state.categories
+      .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+      .join("");
   elements.categoryFilter.value = filters.categoryId;
+
   renderTransactionCategoryOptions(elements.transactionType.value || "expense");
 }
 
 function renderTransactionCategoryOptions(type) {
-  const options = state.categories
-    .filter((category) => category.type === "both" || category.type === type)
-    .map((category) => `<option value="${category.id}">${category.icon} ${escapeHtml(category.name)}</option>`)
+  elements.transactionCategory.innerHTML = state.categories
+    .filter((c) => c.type === "both" || c.type === type)
+    .map((c) => `<option value="${c.id}">${c.icon} ${escapeHtml(c.name)}</option>`)
     .join("");
-  elements.transactionCategory.innerHTML = options;
 }
 
 function renderHome() {
@@ -478,61 +558,70 @@ function renderHome() {
   elements.totalIncome.textContent = formatINR(totals.income);
   elements.totalExpenses.textContent = formatINR(totals.expenses);
 
-  elements.budgetOverview.innerHTML = state.budgets.map((budget) => budgetCardHtml(budget, true)).join("");
+  elements.budgetOverview.innerHTML = state.budgets
+    .map((b) => budgetCardHtml(b, true))
+    .join("");
+
   const recent = state.transactions.slice(0, 5);
-  elements.recentTransactions.innerHTML = recent.length ? recent.map(transactionHtml).join("") : emptyState("No recent transactions yet.");
+  elements.recentTransactions.innerHTML = recent.length
+    ? recent.map(transactionHtml).join("")
+    : emptyState("No recent transactions yet.");
 }
 
 function renderTransactions() {
-  const transactions = getFilteredTransactions();
-  elements.filteredCount.textContent = `${transactions.length} transaction${transactions.length === 1 ? "" : "s"}`;
-  elements.transactionList.innerHTML = transactions.length ? transactions.map(transactionHtml).join("") : emptyState("No transactions match these filters.");
+  const txs = getFilteredTransactions();
+  elements.filteredCount.textContent = `${txs.length} transaction${txs.length === 1 ? "" : "s"}`;
+  elements.transactionList.innerHTML = txs.length
+    ? txs.map(transactionHtml).join("")
+    : emptyState("No transactions match these filters.");
 }
 
 function renderAnalytics() {
-  const transactions = analyticsBudgetId === "all"
-    ? state.transactions
-    : state.transactions.filter((transaction) => transaction.budgetId === analyticsBudgetId);
-  const income = sum(transactions.filter((transaction) => transaction.type === "income").map((transaction) => transaction.amount));
-  const expense = sum(transactions.filter((transaction) => transaction.type === "expense").map((transaction) => transaction.amount));
+  const txs =
+    analyticsBudgetId === "all"
+      ? state.transactions
+      : state.transactions.filter((t) => t.budgetId === analyticsBudgetId);
+  const income = sum(txs.filter((t) => t.type === "income").map((t) => t.amount));
+  const expense = sum(txs.filter((t) => t.type === "expense").map((t) => t.amount));
   elements.analyticsIncome.textContent = formatINR(income);
   elements.analyticsExpense.textContent = formatINR(expense);
   elements.analyticsNet.textContent = formatINR(income - expense);
   elements.analyticsNet.className = income - expense >= 0 ? "income-text" : "expense-text";
-  renderExpenseChart(transactions);
-  renderMonthlyBars(transactions);
+  renderExpenseChart(txs);
+  renderMonthlyBars(txs);
 }
 
 function renderBudgets() {
-  elements.budgetCards.innerHTML = state.budgets.map((budget) => budgetCardHtml(budget, false)).join("");
+  elements.budgetCards.innerHTML = state.budgets.map((b) => budgetCardHtml(b, false)).join("");
 }
 
 function renderCategories() {
-  elements.categoryCards.innerHTML = state.categories.map((category) => {
-    return `
-      <article class="category-card">
-        <header>
-          <div class="tag-row">
-            <span class="category-icon" style="background:${category.color}">${category.icon}</span>
-            <div>
-              <h3>${escapeHtml(category.name)}</h3>
-              <p class="muted">${category.type}</p>
-            </div>
-          </div>
-        </header>
-        <footer>
-          <button class="edit-button" type="button" data-edit-category="${category.id}">Edit</button>
-          <button class="delete-button" type="button" data-delete-category="${category.id}">Delete</button>
-        </footer>
-      </article>
-    `;
-  }).join("");
+  elements.categoryCards.innerHTML = state.categories
+    .map(
+      (c) => `
+    <article class="category-card">
+      <header>
+        <span class="category-icon" style="background:${c.color}">${c.icon}</span>
+        <div>
+          <h3>${escapeHtml(c.name)}</h3>
+          <p class="muted">${c.type}</p>
+        </div>
+      </header>
+      <footer>
+        <button class="edit-button" type="button" data-edit-category="${c.id}">Edit</button>
+        <button class="delete-button" type="button" data-delete-category="${c.id}">Delete</button>
+      </footer>
+    </article>`
+    )
+    .join("");
 }
 
 function budgetCardHtml(budget, compact) {
   const totals = calculateBudgetTotals(budget.id);
-  const spentPercent = budget.limit > 0 ? Math.min(100, (totals.expenses / budget.limit) * 100) : 0;
+  const spentPercent =
+    budget.limit > 0 ? Math.min(100, (totals.expenses / budget.limit) * 100) : 0;
   const activeClass = budget.id === state.activeBudgetId ? " active" : "";
+  const overBudget = budget.limit > 0 && totals.expenses > budget.limit;
   return `
     <article class="budget-card${activeClass}">
       <header>
@@ -542,164 +631,218 @@ function budgetCardHtml(budget, compact) {
         </div>
         <span class="badge">${formatINR(budget.limit)}</span>
       </header>
-      <div class="progress"><span style="width:${spentPercent}%"></span></div>
+      <div class="progress">
+        <span style="width:${spentPercent}%;background:${overBudget ? "var(--expense)" : "var(--primary)"}"></span>
+      </div>
       <p class="muted">Spent ${formatINR(totals.expenses)} · Income ${formatINR(totals.income)}</p>
-      ${compact ? "" : `
-        <footer>
+      ${
+        compact
+          ? ""
+          : `<footer>
           <button class="edit-button" type="button" data-select-budget="${budget.id}">Switch</button>
           <button class="edit-button" type="button" data-edit-budget="${budget.id}">Edit</button>
           <button class="delete-button" type="button" data-delete-budget="${budget.id}">Delete</button>
-        </footer>
-      `}
-    </article>
-  `;
+        </footer>`
+      }
+    </article>`;
 }
 
-function transactionHtml(transaction) {
-  const category = getCategory(transaction.categoryId);
-  const budget = getBudget(transaction.budgetId);
-  const sign = transaction.type === "income" ? "+" : "-";
-  const amountClass = transaction.type === "income" ? "income-text" : "expense-text";
-  const receipt = transaction.receiptName ? `<span class="badge">Receipt</span>` : "";
+function transactionHtml(t) {
+  const cat = getCategory(t.categoryId);
+  const budget = getBudget(t.budgetId);
+  const sign = t.type === "income" ? "+" : "−";
+  const amountClass = t.type === "income" ? "income-text" : "expense-text";
+  const receipt = t.receiptName ? `<span class="badge">📎 Receipt</span>` : "";
   return `
     <article class="transaction-card">
-      <span class="category-icon" style="background:${category.color}">${category.icon}</span>
+      <span class="category-icon" style="background:${cat.color}">${cat.icon}</span>
       <div class="transaction-main">
-        <h3>${escapeHtml(transaction.description)}</h3>
+        <h3>${escapeHtml(t.description)}</h3>
         <div class="transaction-meta">
-          <span class="badge">${escapeHtml(category.name)}</span>
+          <span class="badge">${escapeHtml(cat.name)}</span>
           <span class="badge">${escapeHtml(budget.name)}</span>
           ${receipt}
         </div>
-        <p class="muted">${formatDateTime(transaction.dateTime)}${transaction.notes ? ` · ${escapeHtml(transaction.notes)}` : ""}</p>
+        <p class="muted">${formatDateTime(t.dateTime)}${t.notes ? ` · ${escapeHtml(t.notes)}` : ""}</p>
         <div class="transaction-actions">
-          <button class="edit-button" type="button" data-edit-transaction="${transaction.id}">Edit</button>
-          <button class="delete-button" type="button" data-delete-transaction="${transaction.id}">Delete</button>
+          <button class="edit-button" type="button" data-edit-transaction="${t.id}">Edit</button>
+          <button class="delete-button" type="button" data-delete-transaction="${t.id}">Delete</button>
         </div>
       </div>
-      <strong class="amount ${amountClass}">${sign}${formatINR(transaction.amount)}</strong>
-    </article>
-  `;
+      <strong class="amount ${amountClass}">${sign}${formatINR(t.amount)}</strong>
+    </article>`;
 }
 
 function emptyState(text) {
-  return `<p class="muted">${escapeHtml(text)}</p>`;
+  return `<p class="muted" style="padding:16px 0;text-align:center">${escapeHtml(text)}</p>`;
 }
+
+// ── Charts ─────────────────────────────────────────────────────────────────────
 
 function renderExpenseChart(transactions) {
   const canvas = elements.expenseChart;
   const ctx = canvas.getContext("2d");
-  const expenses = transactions.filter((transaction) => transaction.type === "expense");
-  const categoryTotals = state.categories.map((category) => ({
-    ...category,
-    total: sum(expenses.filter((transaction) => transaction.categoryId === category.id).map((transaction) => transaction.amount)),
-  })).filter((category) => category.total > 0);
-  const total = sum(categoryTotals.map((category) => category.total));
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.lineWidth = 64;
-  ctx.lineCap = "round";
+  const W = canvas.width;
+  const H = canvas.height;
+  const CX = W / 2;
+  const CY = H / 2;
+  const RADIUS = W * 0.3;
+  const LINE_W = W * 0.2;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const expenses = transactions.filter((t) => t.type === "expense");
+  const categoryTotals = state.categories
+    .map((c) => ({
+      ...c,
+      total: sum(
+        expenses.filter((t) => t.categoryId === c.id).map((t) => t.amount)
+      ),
+    }))
+    .filter((c) => c.total > 0);
+
+  const total = sum(categoryTotals.map((c) => c.total));
 
   if (!total) {
-    ctx.fillStyle = "#d9e5e1";
+    // Draw empty ring
+    ctx.lineWidth = LINE_W;
+    ctx.strokeStyle = "#dfeae7";
     ctx.beginPath();
-    ctx.arc(160, 160, 96, 0, Math.PI * 2);
+    ctx.arc(CX, CY, RADIUS, 0, Math.PI * 2);
     ctx.stroke();
+
     ctx.fillStyle = "#62716e";
-    ctx.font = "16px Segoe UI";
+    ctx.font = `bold ${W * 0.05}px Inter, sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("No expense data", 160, 165);
-    elements.categoryBreakdown.innerHTML = emptyState("Add expenses to see category analytics.");
+    ctx.textBaseline = "middle";
+    ctx.fillText("No data", CX, CY);
+
+    elements.categoryBreakdown.innerHTML = emptyState(
+      "Add expenses to see category analytics."
+    );
     return;
   }
 
+  // Draw donut segments
+  ctx.lineWidth = LINE_W;
+  ctx.lineCap = "butt";
   let start = -Math.PI / 2;
-  categoryTotals.forEach((category) => {
-    const angle = (category.total / total) * Math.PI * 2;
-    ctx.strokeStyle = category.color;
+  const GAP = total > 0 ? 0.015 : 0; // tiny gap between segments
+
+  categoryTotals.forEach((c) => {
+    const angle = (c.total / total) * Math.PI * 2 - GAP;
+    ctx.strokeStyle = c.color;
     ctx.beginPath();
-    ctx.arc(160, 160, 96, start, start + angle);
+    ctx.arc(CX, CY, RADIUS, start, start + angle);
     ctx.stroke();
-    category.start = start;
-    category.end = start + angle;
-    start += angle;
+    c.start = start;
+    c.end = start + angle;
+    start += angle + GAP;
   });
 
+  // Centre text
   ctx.fillStyle = "#14211f";
-  ctx.font = "700 18px Segoe UI";
   ctx.textAlign = "center";
-  ctx.fillText("Expenses", 160, 153);
-  ctx.font = "800 20px Segoe UI";
-  ctx.fillText(formatINR(total), 160, 180);
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `700 ${W * 0.05}px Inter, sans-serif`;
+  ctx.fillText("Expenses", CX, CY - W * 0.04);
+  ctx.font = `800 ${W * 0.065}px Inter, sans-serif`;
+  ctx.fillText(formatINR(total), CX, CY + W * 0.045);
 
-  elements.categoryBreakdown.innerHTML = categoryTotals.map((category) => {
-    const percent = total ? (category.total / total) * 100 : 0;
-    return `
+  // Category breakdown list
+  elements.categoryBreakdown.innerHTML = categoryTotals
+    .map((c) => {
+      const pct = total ? (c.total / total) * 100 : 0;
+      return `
       <div class="breakdown-row">
         <div class="breakdown-line">
-          <span><span class="badge" style="background:${category.color};color:#fff">${category.icon}</span> ${escapeHtml(category.name)}</span>
-          <strong>${percent.toFixed(1)}%</strong>
+          <span><span class="badge" style="background:${c.color};color:#fff">${c.icon}</span> ${escapeHtml(c.name)}</span>
+          <strong>${pct.toFixed(1)}%</strong>
         </div>
-        <div class="bar-track"><span style="width:${percent}%;background:${category.color}"></span></div>
-        <p class="muted">${formatINR(category.total)}</p>
-      </div>
-    `;
-  }).join("");
+        <div class="bar-track"><span style="width:${pct}%;background:${c.color}"></span></div>
+        <p class="muted">${formatINR(c.total)}</p>
+      </div>`;
+    })
+    .join("");
 
-  canvas.onpointerdown = (event) => {
+  // Tap interaction on chart
+  canvas.onclick = (e) => {
     const rect = canvas.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * canvas.width - 160;
-    const y = ((event.clientY - rect.top) / rect.height) * canvas.height - 160;
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const x = (e.clientX - rect.left) * scaleX - CX;
+    const y = (e.clientY - rect.top) * scaleY - CY;
+    const dist = Math.sqrt(x * x + y * y);
+    if (dist < RADIUS - LINE_W / 2 || dist > RADIUS + LINE_W / 2) return;
     let angle = Math.atan2(y, x);
     if (angle < -Math.PI / 2) angle += Math.PI * 2;
-    const hit = categoryTotals.find((category) => angle >= category.start && angle <= category.end);
+    const hit = categoryTotals.find((c) => angle >= c.start && angle <= c.end);
     if (hit) elements.chartHint.textContent = `${hit.name}: ${formatINR(hit.total)}`;
   };
 }
 
 function renderMonthlyBars(transactions) {
   const months = new Map();
-  transactions.forEach((transaction) => {
-    const date = new Date(transaction.dateTime);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  transactions.forEach((t) => {
+    const d = new Date(t.dateTime);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     if (!months.has(key)) months.set(key, { income: 0, expense: 0 });
-    months.get(key)[transaction.type] += transaction.amount;
+    months.get(key)[t.type] += t.amount;
   });
-  const rows = [...months.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
-  const max = Math.max(1, ...rows.map(([, totals]) => Math.max(totals.income, totals.expense)));
-  elements.monthlyBars.innerHTML = rows.length ? rows.map(([month, totals]) => `
-    <div class="bar-row">
-      <div class="bar-line">
-        <strong>${month}</strong>
-        <span class="muted">Income ${formatINR(totals.income)} · Expense ${formatINR(totals.expense)}</span>
-      </div>
-      <div class="bar-track"><span style="width:${(totals.expense / max) * 100}%;background:var(--expense)"></span></div>
-      <div class="bar-track"><span style="width:${(totals.income / max) * 100}%;background:var(--income)"></span></div>
-    </div>
-  `).join("") : emptyState("No monthly data yet.");
+  const rows = [...months.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 6);
+  const max = Math.max(1, ...rows.map(([, v]) => Math.max(v.income, v.expense)));
+  elements.monthlyBars.innerHTML = rows.length
+    ? rows
+        .map(
+          ([month, v]) => `
+      <div class="bar-row">
+        <div class="bar-line">
+          <strong>${month}</strong>
+          <span class="muted">Income ${formatINR(v.income)} · Expense ${formatINR(v.expense)}</span>
+        </div>
+        <div class="bar-track"><span style="width:${(v.expense / max) * 100}%;background:var(--expense)"></span></div>
+        <div class="bar-track"><span style="width:${(v.income / max) * 100}%;background:var(--income)"></span></div>
+      </div>`
+        )
+        .join("")
+    : emptyState("No monthly data yet.");
 }
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
 
 function setView(view) {
   activeView = view;
-  elements.views.forEach((item) => item.classList.toggle("active", item.dataset.view === view));
-  document.querySelectorAll(".bottom-nav [data-nav]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.nav === view);
+  elements.views.forEach((el) =>
+    el.classList.toggle("active", el.dataset.view === view)
+  );
+  document.querySelectorAll(".bottom-nav [data-nav]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.nav === view);
   });
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// ── Dialogs ────────────────────────────────────────────────────────────────────
+
 function openTransactionDialog(type = "expense", id = "") {
-  const transaction = id ? state.transactions.find((item) => item.id === id) : null;
-  const txType = transaction?.type || type;
-  elements.transactionDialogTitle.textContent = transaction ? "Edit Transaction" : txType === "income" ? "Add Income" : "Add Expense";
-  elements.transactionId.value = transaction?.id || "";
+  const t = id ? state.transactions.find((item) => item.id === id) : null;
+  const txType = t?.type || type;
+  elements.transactionDialogTitle.textContent = t
+    ? "Edit Transaction"
+    : txType === "income"
+    ? "Add Income"
+    : "Add Expense";
+  elements.transactionId.value = t?.id || "";
   elements.transactionType.value = txType;
-  elements.transactionAmount.value = transaction?.amount || "";
-  elements.transactionDescription.value = transaction?.description || "";
-  elements.transactionDateTime.value = transaction?.dateTime || nowLocalInput();
-  elements.transactionBudget.value = transaction?.budgetId || state.activeBudgetId;
+  elements.transactionAmount.value = t?.amount || "";
+  elements.transactionDescription.value = t?.description || "";
+  elements.transactionDateTime.value = t?.dateTime || nowLocalInput();
+  elements.transactionBudget.value = t?.budgetId || state.activeBudgetId;
   renderTransactionCategoryOptions(txType);
-  elements.transactionCategory.value = transaction?.categoryId || elements.transactionCategory.options[0]?.value || "";
-  elements.transactionNotes.value = transaction?.notes || "";
+  elements.transactionCategory.value =
+    t?.categoryId || elements.transactionCategory.options[0]?.value || "";
+  elements.transactionNotes.value = t?.notes || "";
   elements.transactionReceipt.value = "";
   elements.transactionDialog.showModal();
 }
@@ -708,13 +851,15 @@ async function saveTransactionFromForm() {
   try {
     setLoading(true);
     const existing = elements.transactionId.value
-      ? state.transactions.find((transaction) => transaction.id === elements.transactionId.value)
+      ? state.transactions.find((t) => t.id === elements.transactionId.value)
       : null;
     const receiptFile = elements.transactionReceipt.files[0];
-    const receipt = receiptFile ? await readReceipt(receiptFile) : {
-      receiptName: existing?.receiptName || "",
-      receiptData: existing?.receiptData || "",
-    };
+    const receipt = receiptFile
+      ? await readReceipt(receiptFile)
+      : {
+          receiptName: existing?.receiptName || "",
+          receiptData: existing?.receiptData || "",
+        };
     addOrUpdateTransaction({
       id: elements.transactionId.value,
       type: elements.transactionType.value,
@@ -770,13 +915,13 @@ function saveBudgetFromForm() {
 }
 
 function openCategoryDialog(id = "") {
-  const category = id ? getCategory(id) : null;
-  elements.categoryDialogTitle.textContent = category ? "Edit Category" : "Add Category";
-  elements.categoryId.value = category?.id || "";
-  elements.categoryName.value = category?.name || "";
-  elements.categoryType.value = category?.type || "both";
-  elements.categoryIcon.value = category?.icon || "●";
-  elements.categoryColor.value = category?.color || "#176b5d";
+  const cat = id ? getCategory(id) : null;
+  elements.categoryDialogTitle.textContent = cat ? "Edit Category" : "Add Category";
+  elements.categoryId.value = cat?.id || "";
+  elements.categoryName.value = cat?.name || "";
+  elements.categoryType.value = cat?.type || "both";
+  elements.categoryIcon.value = cat?.icon || "●";
+  elements.categoryColor.value = cat?.color || "#176b5d";
   elements.categoryDialog.showModal();
 }
 
@@ -797,17 +942,19 @@ function saveCategoryFromForm() {
   }
 }
 
+// ── Export ─────────────────────────────────────────────────────────────────────
+
 function getExportRows() {
-  const transactions = getFilteredTransactions();
-  const totals = calculateGlobalTotals(transactions);
-  const rows = transactions.map((transaction) => ({
-    title: transaction.description,
-    amount: transaction.type === "income" ? transaction.amount : -transaction.amount,
-    type: transaction.type,
-    category: getCategory(transaction.categoryId).name,
-    budget: getBudget(transaction.budgetId).name,
-    dateTime: formatDateTime(transaction.dateTime),
-    notes: transaction.notes,
+  const txs = getFilteredTransactions();
+  const totals = calculateGlobalTotals(txs);
+  const rows = txs.map((t) => ({
+    title: t.description,
+    amount: t.type === "income" ? t.amount : -t.amount,
+    type: t.type,
+    category: getCategory(t.categoryId).name,
+    budget: getBudget(t.budgetId).name,
+    dateTime: formatDateTime(t.dateTime),
+    notes: t.notes,
   }));
   return { rows, totals };
 }
@@ -816,13 +963,16 @@ function exportCsv() {
   const { rows, totals } = getExportRows();
   const csvRows = [
     ["Transaction title", "Amount", "Type", "Category", "Budget name", "Date & time", "Notes"],
-    ...rows.map((row) => [row.title, exportAmount(row.amount), row.type, row.category, row.budget, row.dateTime, row.notes]),
+    ...rows.map((r) => [r.title, exportAmount(r.amount), r.type, r.category, r.budget, r.dateTime, r.notes]),
     [],
     ["Total Income", exportAmount(totals.income)],
     ["Total Expenses", exportAmount(totals.expenses)],
     ["Balance", exportAmount(totals.balance)],
   ];
-  downloadBlob(new Blob([csvRows.map(csvLine).join("\n")], { type: "text/csv" }), reportFilename("csv"));
+  downloadBlob(
+    new Blob([csvRows.map(csvLine).join("\n")], { type: "text/csv" }),
+    reportFilename("csv")
+  );
   showToast("CSV exported");
 }
 
@@ -836,12 +986,16 @@ function exportXlsx() {
     ["Balance", totals.balance],
     [],
     ["Transaction title", "Amount", "Type", "Category", "Budget name", "Date & time", "Notes"],
-    ...rows.map((row) => [row.title, row.amount, row.type, row.category, row.budget, row.dateTime, row.notes]),
+    ...rows.map((r) => [r.title, r.amount, r.type, r.category, r.budget, r.dateTime, r.notes]),
   ];
-  const sheetRows = data.map((row, rowIndex) => {
-    const cells = row.map((value, colIndex) => xlsxCell(rowIndex + 1, colIndex + 1, value)).join("");
-    return `<row r="${rowIndex + 1}">${cells}</row>`;
-  }).join("");
+  const sheetRows = data
+    .map((row, ri) => {
+      const cells = row
+        .map((v, ci) => xlsxCell(ri + 1, ci + 1, v))
+        .join("");
+      return `<row r="${ri + 1}">${cells}</row>`;
+    })
+    .join("");
   const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="7" width="24" customWidth="1"/></cols><sheetData>${sheetRows}</sheetData></worksheet>`;
   const bytes = zipStore([
     ["[Content_Types].xml", XLSX_CONTENT_TYPES],
@@ -850,7 +1004,12 @@ function exportXlsx() {
     ["xl/_rels/workbook.xml.rels", XLSX_WORKBOOK_RELS],
     ["xl/worksheets/sheet1.xml", sheetXml],
   ]);
-  downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), reportFilename("xlsx"));
+  downloadBlob(
+    new Blob([bytes], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    reportFilename("xlsx")
+  );
   showToast("Excel exported");
 }
 
@@ -863,15 +1022,27 @@ function exportPdf() {
     `Balance: ${exportAmount(totals.balance)}`,
     "",
     "Title | Amount | Type | Category | Budget | Date & Time | Notes",
-    ...rows.map((row) => `${row.title} | ${exportAmount(row.amount)} | ${row.type} | ${row.category} | ${row.budget} | ${row.dateTime} | ${row.notes}`),
+    ...rows.map(
+      (r) =>
+        `${r.title} | ${exportAmount(r.amount)} | ${r.type} | ${r.category} | ${r.budget} | ${r.dateTime} | ${r.notes}`
+    ),
   ];
-  downloadBlob(new Blob([buildPdf(lines)], { type: "application/pdf" }), reportFilename("pdf"));
+  downloadBlob(
+    new Blob([buildPdf(lines)], { type: "application/pdf" }),
+    reportFilename("pdf")
+  );
   showToast("PDF exported");
 }
 
+// ── PDF builder ────────────────────────────────────────────────────────────────
+
 function buildPdf(lines) {
   const pages = chunk(lines, 36);
-  const objects = ["<< /Type /Catalog /Pages 2 0 R >>", "", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"];
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
   const kids = [];
   pages.forEach((pageLines, index) => {
     const pageObject = 4 + index * 2;
@@ -884,13 +1055,13 @@ function buildPdf(lines) {
   objects[1] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${pages.length} >>`;
   const parts = ["%PDF-1.4\n"];
   const offsets = [0];
-  objects.forEach((object, index) => {
+  objects.forEach((obj, i) => {
     offsets.push(latinBytes(parts.join("")).length);
-    parts.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
+    parts.push(`${i + 1} 0 obj\n${obj}\nendobj\n`);
   });
   const xref = latinBytes(parts.join("")).length;
   parts.push(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`);
-  offsets.slice(1).forEach((offset) => parts.push(`${String(offset).padStart(10, "0")} 00000 n \n`));
+  offsets.slice(1).forEach((o) => parts.push(`${String(o).padStart(10, "0")} 00000 n \n`));
   parts.push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
   return latinBytes(parts.join(""));
 }
@@ -917,7 +1088,7 @@ function pdfPage(lines, page, count) {
 }
 
 function csvLine(values) {
-  return values.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(",");
+  return values.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",");
 }
 
 function reportFilename(ext) {
@@ -926,17 +1097,22 @@ function reportFilename(ext) {
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.append(a);
+  a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
+// ── Backup & restore ───────────────────────────────────────────────────────────
+
 function backupData() {
-  downloadBlob(new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }), `finance-backup-${todayDate()}.json`);
+  downloadBlob(
+    new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
+    `finance-backup-${todayDate()}.json`
+  );
   showToast("Backup exported");
 }
 
@@ -952,6 +1128,8 @@ async function restoreData(file) {
   }
 }
 
+// ── UI helpers ─────────────────────────────────────────────────────────────────
+
 function setLoading(value) {
   elements.loading.hidden = !value;
 }
@@ -960,38 +1138,31 @@ function showToast(message) {
   elements.toast.textContent = message;
   elements.toast.classList.add("show");
   window.clearTimeout(showToast.timer);
-  showToast.timer = window.setTimeout(() => elements.toast.classList.remove("show"), 2400);
+  showToast.timer = window.setTimeout(
+    () => elements.toast.classList.remove("show"),
+    2400
+  );
 }
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  })[char]);
-}
+// ── Low-level helpers ──────────────────────────────────────────────────────────
 
 function pdfText(value) {
-  const text = String(value).replace(/[^\x20-\x7E]/g, "?").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+  const text = String(value)
+    .replace(/[^\x20-\x7E]/g, "?")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
   return `(${text})`;
 }
 
 function latinBytes(value) {
   const bytes = new Uint8Array(value.length);
-  for (let index = 0; index < value.length; index += 1) bytes[index] = value.charCodeAt(index) & 0xff;
+  for (let i = 0; i < value.length; i++) bytes[i] = value.charCodeAt(i) & 0xff;
   return bytes;
 }
 
-function chunk(items, size) {
-  const output = [];
-  for (let index = 0; index < items.length; index += size) output.push(items.slice(index, index + size));
-  return output.length ? output : [[]];
-}
-
-function xlsxCell(row, column, value) {
-  const ref = `${columnName(column)}${row}`;
+function xlsxCell(row, col, value) {
+  const ref = `${columnName(col)}${row}`;
   if (typeof value === "number") return `<c r="${ref}"><v>${value}</v></c>`;
   return `<c r="${ref}" t="inlineStr"><is><t>${escapeHtml(value)}</t></is></c>`;
 }
@@ -999,59 +1170,69 @@ function xlsxCell(row, column, value) {
 function columnName(index) {
   let name = "";
   while (index > 0) {
-    const remainder = (index - 1) % 26;
-    name = String.fromCharCode(65 + remainder) + name;
+    const rem = (index - 1) % 26;
+    name = String.fromCharCode(65 + rem) + name;
     index = Math.floor((index - 1) / 26);
   }
   return name;
 }
 
 function zipStore(files) {
-  const encoder = new TextEncoder();
+  const enc = new TextEncoder();
   const localParts = [];
   const centralParts = [];
   let offset = 0;
   files.forEach(([name, data]) => {
-    const nameBytes = encoder.encode(name);
-    const dataBytes = typeof data === "string" ? encoder.encode(data) : data;
+    const nameBytes = enc.encode(name);
+    const dataBytes = typeof data === "string" ? enc.encode(data) : data;
     const crc = crc32(dataBytes);
-    const local = concatBytes(u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(dataBytes.length), u32(dataBytes.length), u16(nameBytes.length), u16(0), nameBytes);
-    const central = concatBytes(u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(dataBytes.length), u32(dataBytes.length), u16(nameBytes.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), nameBytes);
+    const local = concatBytes(
+      u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0),
+      u32(crc), u32(dataBytes.length), u32(dataBytes.length),
+      u16(nameBytes.length), u16(0), nameBytes
+    );
+    const central = concatBytes(
+      u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0),
+      u32(crc), u32(dataBytes.length), u32(dataBytes.length),
+      u16(nameBytes.length), u16(0), u16(0), u16(0), u16(0),
+      u32(0), u32(offset), nameBytes
+    );
     localParts.push(local, dataBytes);
     centralParts.push(central);
     offset += local.length + dataBytes.length;
   });
-  const centralSize = centralParts.reduce((total, part) => total + part.length, 0);
-  const end = concatBytes(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(centralSize), u32(offset), u16(0));
+  const centralSize = centralParts.reduce((t, p) => t + p.length, 0);
+  const end = concatBytes(
+    u32(0x06054b50), u16(0), u16(0),
+    u16(files.length), u16(files.length),
+    u32(centralSize), u32(offset), u16(0)
+  );
   return concatBytes(...localParts, ...centralParts, end);
 }
 
-function u16(value) {
-  const bytes = new Uint8Array(2);
-  new DataView(bytes.buffer).setUint16(0, value, true);
-  return bytes;
+function u16(v) {
+  const b = new Uint8Array(2);
+  new DataView(b.buffer).setUint16(0, v, true);
+  return b;
 }
 
-function u32(value) {
-  const bytes = new Uint8Array(4);
-  new DataView(bytes.buffer).setUint32(0, value >>> 0, true);
-  return bytes;
+function u32(v) {
+  const b = new Uint8Array(4);
+  new DataView(b.buffer).setUint32(0, v >>> 0, true);
+  return b;
 }
 
 function concatBytes(...parts) {
-  const output = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+  const out = new Uint8Array(parts.reduce((t, p) => t + p.length, 0));
   let offset = 0;
-  parts.forEach((part) => {
-    output.set(part, offset);
-    offset += part.length;
-  });
-  return output;
+  parts.forEach((p) => { out.set(p, offset); offset += p.length; });
+  return out;
 }
 
-const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
-  let value = index;
-  for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-  return value >>> 0;
+const CRC_TABLE = Array.from({ length: 256 }, (_, i) => {
+  let v = i;
+  for (let b = 0; b < 8; b++) v = v & 1 ? 0xedb88320 ^ (v >>> 1) : v >>> 1;
+  return v >>> 0;
 });
 
 function crc32(bytes) {
@@ -1065,8 +1246,10 @@ const XLSX_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relat
 const XLSX_WORKBOOK = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Transactions" sheetId="1" r:id="rId1"/></sheets></workbook>`;
 const XLSX_WORKBOOK_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`;
 
-document.addEventListener("click", (event) => {
-  const target = event.target.closest("button");
+// ── Event listeners ────────────────────────────────────────────────────────────
+
+document.addEventListener("click", (e) => {
+  const target = e.target.closest("button");
   if (!target) return;
   if (target.dataset.nav) setView(target.dataset.nav);
   if (target.dataset.openTransaction) openTransactionDialog(target.dataset.openTransaction);
@@ -1086,6 +1269,33 @@ document.addEventListener("click", (event) => {
   if (target.dataset.export === "csv") exportCsv();
   if (target.dataset.export === "xlsx") exportXlsx();
   if (target.dataset.export === "pdf") exportPdf();
+});
+
+// Dialog close buttons (type="button" — no form submit side-effects)
+document.querySelector("#closeTransactionDialog")?.addEventListener("click", () =>
+  elements.transactionDialog.close()
+);
+document.querySelector("#cancelTransactionButton")?.addEventListener("click", () =>
+  elements.transactionDialog.close()
+);
+document.querySelector("#closeBudgetDialog")?.addEventListener("click", () =>
+  elements.budgetDialog.close()
+);
+document.querySelector("#cancelBudgetButton")?.addEventListener("click", () =>
+  elements.budgetDialog.close()
+);
+document.querySelector("#closeCategoryDialog")?.addEventListener("click", () =>
+  elements.categoryDialog.close()
+);
+document.querySelector("#cancelCategoryButton")?.addEventListener("click", () =>
+  elements.categoryDialog.close()
+);
+
+// Close dialog on backdrop click
+[elements.transactionDialog, elements.budgetDialog, elements.categoryDialog].forEach((dlg) => {
+  dlg?.addEventListener("click", (e) => {
+    if (e.target === dlg) dlg.close();
+  });
 });
 
 elements.searchToggle.addEventListener("click", () => {
@@ -1109,11 +1319,13 @@ elements.analyticsBudgetSelect.addEventListener("change", () => {
   renderAnalytics();
 });
 
-elements.typeTabs.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-type-filter]");
-  if (!button) return;
-  filters.type = button.dataset.typeFilter;
-  elements.typeTabs.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button));
+elements.typeTabs.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-type-filter]");
+  if (!btn) return;
+  filters.type = btn.dataset.typeFilter;
+  elements.typeTabs
+    .querySelectorAll("button")
+    .forEach((b) => b.classList.toggle("active", b === btn));
   renderTransactions();
 });
 
@@ -1138,7 +1350,7 @@ elements.categoryFilter.addEventListener("change", () => {
 });
 
 elements.budgetFilter.addEventListener("change", () => {
-  filters.budgetIds = [...elements.budgetFilter.selectedOptions].map((option) => option.value);
+  filters.budgetIds = [...elements.budgetFilter.selectedOptions].map((o) => o.value);
   renderTransactions();
 });
 
@@ -1148,7 +1360,9 @@ elements.clearFilters.addEventListener("click", () => {
   elements.quickFilter.value = "all";
   elements.fromDate.value = "";
   elements.toDate.value = "";
-  elements.typeTabs.querySelectorAll("button").forEach((button) => button.classList.toggle("active", button.dataset.typeFilter === "all"));
+  elements.typeTabs
+    .querySelectorAll("button")
+    .forEach((b) => b.classList.toggle("active", b.dataset.typeFilter === "all"));
   render();
   showToast("Filters cleared");
 });
@@ -1163,11 +1377,13 @@ elements.restoreInput.addEventListener("change", () => {
   if (file) restoreData(file);
 });
 elements.resetBudgetButton.addEventListener("click", resetActiveBudget);
-elements.transactionType.addEventListener("change", () => renderTransactionCategoryOptions(elements.transactionType.value));
+elements.transactionType.addEventListener("change", () =>
+  renderTransactionCategoryOptions(elements.transactionType.value)
+);
 
-window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault();
-  deferredInstallPrompt = event;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
   elements.installButton.hidden = false;
 });
 
@@ -1181,9 +1397,13 @@ elements.installButton.addEventListener("click", async () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => showToast("Offline support could not be started"));
+    navigator.serviceWorker
+      .register("sw.js")
+      .catch(() => showToast("Offline support could not be started"));
   });
 }
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
 
 sortTransactions();
 saveState();
