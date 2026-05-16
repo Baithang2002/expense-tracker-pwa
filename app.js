@@ -1,6 +1,6 @@
 const STORAGE_KEY = "finance-manager-v1";
 const LEGACY_KEY = "expense-tracker-state-v1";
-const MAX_RECEIPT_BYTES = 1_500_000;
+const MAX_RECEIPT_BYTES = 3_000_000;
 
 const INR = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -902,7 +902,7 @@ async function saveTransactionFromForm() {
 function readReceipt(file) {
   if (file.size > MAX_RECEIPT_BYTES) {
     return Promise.reject(
-      new Error("Receipt photo is too large. Please choose an image under 1.5 MB."),
+      new Error("Receipt photo is too large. Please choose an image under 3 MB."),
     );
   }
 
