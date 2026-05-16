@@ -986,12 +986,16 @@ function getExportRows() {
 function exportCsv() {
   const { rows, totals } = getExportRows();
   const csvRows = [
-    ["Transaction title", "Amount", "Type", "Category", "Budget name", "Date & time", "Notes"],
-    ...rows.map((r) => [r.title, exportAmount(r.amount), r.type, r.category, r.budget, r.dateTime, r.notes]),
+    ["RUPEE FINANCE MANAGER - EXPENSE REPORT"],
     [],
+    ["SUMMARY"],
     ["Total Income", exportAmount(totals.income)],
     ["Total Expenses", exportAmount(totals.expenses)],
-    ["Balance", exportAmount(totals.balance)],
+    ["Net Balance", exportAmount(totals.balance)],
+    [],
+    ["TRANSACTIONS"],
+    ["Title", "Amount", "Type", "Category", "Budget", "Date & Time", "Notes"],
+    ...rows.map((r) => [r.title, exportAmount(r.amount), r.type, r.category, r.budget, r.dateTime, r.notes]),
   ];
   downloadBlob(
     new Blob([csvRows.map(csvLine).join("\n")], { type: "text/csv" }),
@@ -1003,24 +1007,27 @@ function exportCsv() {
 function exportXlsx() {
   const { rows, totals } = getExportRows();
   const data = [
-    ["Rupee Finance Manager"],
+    ["RUPEE FINANCE MANAGER - EXPENSE REPORT"],
     [],
+    ["SUMMARY"],
     ["Total Income", totals.income],
     ["Total Expenses", totals.expenses],
-    ["Balance", totals.balance],
+    ["Net Balance", totals.balance],
     [],
-    ["Transaction title", "Amount", "Type", "Category", "Budget name", "Date & time", "Notes"],
+    ["TRANSACTIONS"],
+    ["Title", "Amount", "Type", "Category", "Budget", "Date & Time", "Notes"],
     ...rows.map((r) => [r.title, r.amount, r.type, r.category, r.budget, r.dateTime, r.notes]),
   ];
   const sheetRows = data
     .map((row, ri) => {
+      const isBold = ri === 0 || ri === 2 || ri === 8;
       const cells = row
-        .map((v, ci) => xlsxCell(ri + 1, ci + 1, v))
+        .map((v, ci) => xlsxCell(ri + 1, ci + 1, v, isBold))
         .join("");
       return `<row r="${ri + 1}">${cells}</row>`;
     })
     .join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="7" width="24" customWidth="1"/></cols><sheetData>${sheetRows}</sheetData></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="7" width="20" customWidth="1"/></cols><sheetData>${sheetRows}</sheetData></worksheet>`;
   const bytes = zipStore([
     ["[Content_Types].xml", XLSX_CONTENT_TYPES],
     ["_rels/.rels", XLSX_RELS],
@@ -1039,50 +1046,47 @@ function exportXlsx() {
 
 function exportPdf() {
   const { rows, totals } = getExportRows();
-  const lines = [
-    "Rupee Finance Manager",
-    `Total Income: ${exportAmount(totals.income)}`,
-    `Total Expenses: ${exportAmount(totals.expenses)}`,
-    `Balance: ${exportAmount(totals.balance)}`,
-    "",
-    "Title | Amount | Type | Category | Budget | Date & Time | Notes",
-    ...rows.map(
-      (r) =>
-        `${r.title} | ${exportAmount(r.amount)} | ${r.type} | ${r.category} | ${r.budget} | ${r.dateTime} | ${r.notes}`
-    ),
-  ];
   downloadBlob(
-    new Blob([buildPdf(lines)], { type: "application/pdf" }),
+    new Blob([buildPdfTable(rows, totals)], { type: "application/pdf" }),
     reportFilename("pdf")
   );
   showToast("PDF exported");
 }
 
-// ── PDF builder ────────────────────────────────────────────────────────────────
+function buildPdfTable(rows, totals) {
+  const pages = [];
+  const rowsPerPage = 18;
 
-function buildPdf(lines) {
-  const pages = chunk(lines, 36);
+  for (let i = 0; i < rows.length; i += rowsPerPage) {
+    pages.push(rows.slice(i, i + rowsPerPage));
+  }
+
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "",
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
   ];
+
   const kids = [];
-  pages.forEach((pageLines, index) => {
-    const pageObject = 4 + index * 2;
+  pages.forEach((pageRows, pageIndex) => {
+    const pageObject = 6 + pageIndex * 2;
     const contentObject = pageObject + 1;
-    const content = pdfPage(pageLines, index + 1, pages.length);
+    const content = pdfPageTable(pageRows, totals, pageIndex + 1, pages.length);
     kids.push(`${pageObject} 0 R`);
-    objects[pageObject - 1] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObject} 0 R >>`;
+    objects[pageObject - 1] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentObject} 0 R >>`;
     objects[contentObject - 1] = `<< /Length ${latinBytes(content).length} >>\nstream\n${content}\nendstream`;
   });
+
   objects[1] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${pages.length} >>`;
+
   const parts = ["%PDF-1.4\n"];
   const offsets = [0];
   objects.forEach((obj, i) => {
     offsets.push(latinBytes(parts.join("")).length);
     parts.push(`${i + 1} 0 obj\n${obj}\nendobj\n`);
   });
+
   const xref = latinBytes(parts.join("")).length;
   parts.push(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`);
   offsets.slice(1).forEach((o) => parts.push(`${String(o).padStart(10, "0")} 00000 n \n`));
@@ -1090,24 +1094,92 @@ function buildPdf(lines) {
   return latinBytes(parts.join(""));
 }
 
-function pdfPage(lines, page, count) {
-  let y = 746;
+function pdfPageTable(rows, totals, page, totalPages) {
+  let y = 760;
+  const colWidths = [80, 60, 45, 70, 80, 90, 87];
+  const rowHeight = 12;
+
   const commands = [
     "0.95 0.98 0.97 rg 0 0 612 792 re f",
-    "BT /F1 16 Tf 0 0 0 rg",
-    `1 0 0 1 54 ${y} Tm ${pdfText(lines[0] || "Rupee Finance Manager")} Tj`,
+    "BT /F2 14 Tf 0 0 0 rg",
+    `1 0 0 1 36 ${y} Tm (Rupee Finance Manager) Tj`,
     "ET",
     "BT /F1 8 Tf 0.35 0.42 0.4 rg",
-    `1 0 0 1 510 746 Tm ${pdfText(`Page ${page}/${count}`)} Tj`,
+    `1 0 0 1 520 ${y} Tm (Page ${page}/${totalPages}) Tj`,
     "ET",
-    "BT /F1 9 Tf 0 0 0 rg",
   ];
-  y -= 28;
-  lines.slice(1).forEach((line) => {
-    commands.push(`1 0 0 1 54 ${y} Tm ${pdfText(line.slice(0, 112))} Tj`);
-    y -= 18;
+
+  y -= 20;
+
+  commands.push("BT /F2 10 Tf 0 0 0 rg");
+  commands.push(`1 0 0 1 36 ${y} Tm (SUMMARY) Tj`);
+  commands.push("ET");
+
+  y -= 14;
+  commands.push("BT /F1 9 Tf");
+  commands.push(`1 0 0 1 36 ${y} Tm (Total Income: ${exportAmount(totals.income)}) Tj`);
+  commands.push("ET");
+
+  y -= 10;
+  commands.push("BT /F1 9 Tf");
+  commands.push(`1 0 0 1 36 ${y} Tm (Total Expenses: ${exportAmount(totals.expenses)}) Tj`);
+  commands.push("ET");
+
+  y -= 10;
+  commands.push("BT /F1 9 Tf");
+  commands.push(`1 0 0 1 36 ${y} Tm (Net Balance: ${exportAmount(totals.balance)}) Tj`);
+  commands.push("ET");
+
+  y -= 18;
+
+  commands.push("BT /F2 10 Tf 0 0 0 rg");
+  commands.push(`1 0 0 1 36 ${y} Tm (TRANSACTIONS) Tj`);
+  commands.push("ET");
+
+  y -= 14;
+
+  const headers = ["Title", "Amount", "Type", "Category", "Budget", "Date", "Notes"];
+  let x = 36;
+  const tableWidth = colWidths.reduce((a, b) => a + b);
+  commands.push(`0.8 0.8 0.8 rg 36 ${y - 2} ${tableWidth} 14 re f`);
+  commands.push("BT /F2 8 Tf 1 1 1 rg");
+
+  headers.forEach((h, i) => {
+    commands.push(`1 0 0 1 ${x + 2} ${y + 3} Tm (${pdfText(h)}) Tj`);
+    x += colWidths[i];
   });
   commands.push("ET");
+
+  y -= 14;
+
+  commands.push("0 0 0 rg 0.5 w");
+  commands.push(`36 ${y} ${36 + tableWidth} ${y} l S`);
+
+  rows.forEach((r) => {
+    if (y < 50) return;
+
+    x = 36;
+    const rowData = [
+      r.title.slice(0, 20),
+      r.amount.toLocaleString("en-IN", { maximumFractionDigits: 2 }),
+      r.type,
+      r.category.slice(0, 12),
+      r.budget.slice(0, 12),
+      r.dateTime.slice(0, 10),
+      r.notes.slice(0, 15),
+    ];
+
+    commands.push("BT /F1 7.5 Tf 0 0 0 rg");
+    rowData.forEach((cell, i) => {
+      commands.push(`1 0 0 1 ${x + 1} ${y - 8} Tm (${pdfText(cell)}) Tj`);
+      x += colWidths[i];
+    });
+    commands.push("ET");
+
+    y -= rowHeight;
+    commands.push(`36 ${y} ${36 + tableWidth} ${y} l S`);
+  });
+
   return commands.join("\n");
 }
 
@@ -1185,10 +1257,11 @@ function latinBytes(value) {
   return bytes;
 }
 
-function xlsxCell(row, col, value) {
+function xlsxCell(row, col, value, bold = false) {
   const ref = `${columnName(col)}${row}`;
-  if (typeof value === "number") return `<c r="${ref}"><v>${value}</v></c>`;
-  return `<c r="${ref}" t="inlineStr"><is><t>${escapeHtml(value)}</t></is></c>`;
+  const style = bold ? ' s="2"' : '';
+  if (typeof value === "number") return `<c r="${ref}"${style}><v>${value}</v></c>`;
+  return `<c r="${ref}" t="inlineStr"${style}><is><t>${escapeHtml(value)}</t></is></c>`;
 }
 
 function columnName(index) {
