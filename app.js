@@ -985,20 +985,31 @@ function getExportRows() {
 
 function exportCsv() {
   const { rows, totals } = getExportRows();
+  const now = new Date().toLocaleString("en-IN");
   const csvRows = [
-    ["RUPEE FINANCE MANAGER - EXPENSE REPORT"],
+    ["FINANCE MANAGER - EXPENSE REPORT"],
+    ["Generated At", now],
     [],
     ["SUMMARY"],
-    ["Total Income", exportAmount(totals.income)],
-    ["Total Expenses", exportAmount(totals.expenses)],
-    ["Net Balance", exportAmount(totals.balance)],
+    ["Metric", "Value"],
+    ["Total Income", totals.income.toFixed(2)],
+    ["Total Expenses", totals.expenses.toFixed(2)],
+    ["Net Balance", totals.balance.toFixed(2)],
     [],
     ["TRANSACTIONS"],
-    ["Title", "Amount", "Type", "Category", "Budget", "Date & Time", "Notes"],
-    ...rows.map((r) => [r.title, exportAmount(r.amount), r.type, r.category, r.budget, r.dateTime, r.notes]),
+    ["Date & Time", "Title", "Type", "Category", "Budget", "Amount", "Notes"],
+    ...rows.map((r) => [
+      r.dateTime,
+      r.title,
+      r.type,
+      r.category,
+      r.budget,
+      Number(r.amount).toFixed(2),
+      r.notes,
+    ]),
   ];
   downloadBlob(
-    new Blob([csvRows.map(csvLine).join("\n")], { type: "text/csv" }),
+    new Blob([csvRows.map(csvLine).join("\n")], { type: "text/csv;charset=utf-8;" }),
     reportFilename("csv")
   );
   showToast("CSV exported");
@@ -1006,21 +1017,25 @@ function exportCsv() {
 
 function exportXlsx() {
   const { rows, totals } = getExportRows();
+  const now = new Date().toLocaleString("en-IN");
   const data = [
-    ["RUPEE FINANCE MANAGER - EXPENSE REPORT"],
+    ["FINANCE MANAGER - EXPENSE REPORT"],
+    ["Generated", now],
     [],
     ["SUMMARY"],
+    ["Metric", "Value"],
     ["Total Income", totals.income],
     ["Total Expenses", totals.expenses],
     ["Net Balance", totals.balance],
     [],
     ["TRANSACTIONS"],
-    ["Title", "Amount", "Type", "Category", "Budget", "Date & Time", "Notes"],
-    ...rows.map((r) => [r.title, r.amount, r.type, r.category, r.budget, r.dateTime, r.notes]),
+    ["Date & Time", "Title", "Type", "Category", "Budget", "Amount", "Notes"],
+    ...rows.map((r) => [r.dateTime, r.title, r.type, r.category, r.budget, r.amount, r.notes]),
   ];
+  const boldIndices = new Set([0, 3, 4, 9, 10]);
   const sheetRows = data
     .map((row, ri) => {
-      const isBold = ri === 0 || ri === 2 || ri === 8;
+      const isBold = boldIndices.has(ri);
       const cells = row
         .map((v, ci) => xlsxCell(ri + 1, ci + 1, v, isBold))
         .join("");
@@ -1102,7 +1117,7 @@ function pdfPageTable(rows, totals, page, totalPages) {
   const commands = [
     "0.95 0.98 0.97 rg 0 0 612 792 re f",
     "BT /F2 14 Tf 0 0 0 rg",
-    `1 0 0 1 36 ${y} Tm (Rupee Finance Manager) Tj`,
+    `1 0 0 1 36 ${y} Tm (FINANCE MANAGER) Tj`,
     "ET",
     "BT /F1 8 Tf 0.35 0.42 0.4 rg",
     `1 0 0 1 520 ${y} Tm (Page ${page}/${totalPages}) Tj`,
