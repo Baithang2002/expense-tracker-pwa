@@ -730,6 +730,35 @@ dialog::backdrop {
   padding-top: 4px;
 }
 
+.receipt-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.receipt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.receipt-header h2 {
+  margin: 0;
+}
+
+.receipt-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 14px;
+  display: block;
+  max-height: calc(100dvh - 200px);
+}
+
 /* ── Toast / Loading ─────────────────────────────────── */
 .toast,
 .loading {

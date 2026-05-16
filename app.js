@@ -91,6 +91,8 @@ const elements = {
   categoryIcon: document.querySelector("#categoryIcon"),
   categoryColor: document.querySelector("#categoryColor"),
   saveCategoryButton: document.querySelector("#saveCategoryButton"),
+  receiptDialog: document.querySelector("#receiptDialog"),
+  receiptImage: document.querySelector("#receiptImage"),
   toast: document.querySelector("#toast"),
   loading: document.querySelector("#loading"),
 };
@@ -389,11 +391,8 @@ function viewReceipt(id) {
     return;
   }
 
-  const link = document.createElement("a");
-  link.href = t.receiptData;
-  link.target = "_blank";
-  link.rel = "noopener";
-  link.click();
+  elements.receiptImage.src = t.receiptData;
+  elements.receiptDialog.showModal();
 }
 
 function addOrUpdateBudget(payload) {
@@ -1327,9 +1326,12 @@ document.querySelector("#closeCategoryDialog")?.addEventListener("click", () =>
 document.querySelector("#cancelCategoryButton")?.addEventListener("click", () =>
   elements.categoryDialog.close()
 );
+document.querySelector("#closeReceiptDialog")?.addEventListener("click", () =>
+  elements.receiptDialog.close()
+);
 
 // Close dialog on backdrop click
-[elements.transactionDialog, elements.budgetDialog, elements.categoryDialog].forEach((dlg) => {
+[elements.transactionDialog, elements.budgetDialog, elements.categoryDialog, elements.receiptDialog].forEach((dlg) => {
   dlg?.addEventListener("click", (e) => {
     if (e.target === dlg) dlg.close();
   });

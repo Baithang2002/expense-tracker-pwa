@@ -324,6 +324,17 @@
       </form>
     </dialog>
 
+    <!-- ── RECEIPT VIEWER ────────────────────────────── -->
+    <dialog id="receiptDialog">
+      <div class="receipt-viewer">
+        <div class="receipt-header">
+          <h2>Receipt / Photo</h2>
+          <button class="icon-button ghost" type="button" id="closeReceiptDialog" aria-label="Close">×</button>
+        </div>
+        <img id="receiptImage" src="" alt="Receipt photo" class="receipt-image">
+      </div>
+    </dialog>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <div id="loading" class="loading" hidden>Saving…</div>
     <script src="app.js" defer></script>
