@@ -15,6 +15,25 @@
   --shadow: 0 14px 36px rgba(23, 54, 48, 0.11);
   --radius-card: 22px;
   --radius-inner: 14px;
+  --nav-bg: rgba(255, 255, 255, 0.94);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0c1413;
+  --surface: #152220;
+  --surface-2: #1d2d2a;
+  --ink: #e5edea;
+  --muted: #8fa39f;
+  --line: #293d3a;
+  --primary: #1da38f;
+  --primary-dark: #12806f;
+  --primary-soft: #1c3d39;
+  --income: #22c55e;
+  --expense: #ef4444;
+  --warning: #f59e0b;
+  --shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+  --nav-bg: rgba(21, 34, 32, 0.94);
 }
 
 * {
@@ -80,7 +99,7 @@ textarea {
   min-height: 46px;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-inner);
-  background: #fbfdfc;
+  background: var(--surface-2);
   color: var(--ink);
   padding: 11px 13px;
   transition: border-color 140ms ease;
@@ -663,7 +682,7 @@ canvas {
   grid-template-columns: repeat(5, 1fr);
   gap: 4px;
   border-top: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--nav-bg);
   padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -872,11 +891,36 @@ dialog::backdrop {
   }
 
   .filter-grid {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .filter-grid label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    flex: 1 1 calc(50% - 6px);
+    min-width: 130px;
+  }
+
+  .filter-grid label span {
+    margin: 0;
+    font-size: 0.74rem;
+    white-space: nowrap;
+    text-transform: capitalize;
+  }
+
+  .filter-grid label input,
+  .filter-grid label select {
+    min-height: 38px;
+    padding: 6px 8px;
   }
 
   .filter-grid .segmented {
-    grid-column: 1;
+    flex: 1 1 100%;
   }
 
   .actions {
@@ -955,4 +999,27 @@ dialog::backdrop {
   .quick-actions {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Dark Mode Overrides ─────────────────────────────── */
+[data-theme="dark"] .danger-panel {
+  background: #281717;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+[data-theme="dark"] .balance-card {
+  background: linear-gradient(135deg, #162a26 0%, var(--surface) 100%);
+  border-color: rgba(29, 163, 143, 0.3);
+}
+
+[data-theme="dark"] .budget-card.active {
+  box-shadow: inset 0 0 0 1px var(--primary), 0 0 0 3px rgba(29, 163, 143, 0.15);
+}
+
+[data-theme="dark"] .transaction-card {
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .transaction-card:hover {
+  background: var(--surface-2);
 }

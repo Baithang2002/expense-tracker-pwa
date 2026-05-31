@@ -2,11 +2,66 @@ const STORAGE_KEY = "finance-manager-v1";
 const LEGACY_KEY = "expense-tracker-state-v1";
 const MAX_RECEIPT_BYTES = 3_000_000;
 
-const INR = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 2,
-});
+const CURRENCY_FORMATS = {
+  INR: { locale: "en-IN", currency: "INR" },
+  USD: { locale: "en-US", currency: "USD" },
+  EUR: { locale: "en-IE", currency: "EUR" },
+  GBP: { locale: "en-GB", currency: "GBP" },
+  JPY: { locale: "ja-JP", currency: "JPY" },
+  AUD: { locale: "en-AU", currency: "AUD" },
+};
+
+function getCurrencyFormatter() {
+  const code = state?.preferredCurrency || "INR";
+  const cfg = CURRENCY_FORMATS[code] || CURRENCY_FORMATS.INR;
+  return new Intl.NumberFormat(cfg.locale, {
+    style: "currency",
+    currency: cfg.currency,
+    maximumFractionDigits: 2,
+  });
+}
+
+const DB_NAME = "FinanceManagerDB";
+const DB_VERSION = 1;
+const STORE_NAME = "stateStore";
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function getStoredState() {
+  return openDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readonly");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get("appState");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  });
+}
+
+function setStoredState(data) {
+  return openDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.put(data, "appState");
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  });
+}
 
 const DEFAULT_BUDGETS = [
   ["personal", "Personal Budget", 0],
@@ -64,6 +119,10 @@ const elements = {
   backupButton: document.querySelector("#backupButton"),
   restoreInput: document.querySelector("#restoreInput"),
   resetBudgetButton: document.querySelector("#resetBudgetButton"),
+  themeSelect: document.querySelector("#themeSelect"),
+  currencySelect: document.querySelector("#currencySelect"),
+  storageUsage: document.querySelector("#storageUsage"),
+  resetAllDataButton: document.querySelector("#resetAllDataButton"),
   transactionDialog: document.querySelector("#transactionDialog"),
   transactionForm: document.querySelector("#transactionForm"),
   transactionDialogTitle: document.querySelector("#transactionDialogTitle"),
@@ -97,7 +156,7 @@ const elements = {
   loading: document.querySelector("#loading"),
 };
 
-let state = loadState();
+let state = createInitialState();
 let deferredInstallPrompt = null;
 let activeView = "home";
 let analyticsBudgetId = "all";
@@ -125,15 +184,17 @@ function roundMoney(amount) {
 }
 
 function parseAmount(value) {
-  return Number(String(value).replace(/[₹,\s]/g, ""));
+  return Number(String(value).replace(/[₹$,€£¥\s]/g, ""));
 }
 
 function formatINR(amount) {
-  return INR.format(roundMoney(amount));
+  return getCurrencyFormatter().format(roundMoney(amount));
 }
 
 function exportAmount(amount) {
-  return `INR ${roundMoney(amount).toLocaleString("en-IN", {
+  const code = state?.preferredCurrency || "INR";
+  const cfg = CURRENCY_FORMATS[code] || CURRENCY_FORMATS.INR;
+  return `${code} ${roundMoney(amount).toLocaleString(cfg.locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -182,29 +243,37 @@ function showEarlyError(message) {
 
 // ── State persistence ──────────────────────────────────────────────────────────
 
-function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      if (parsed && Array.isArray(parsed.budgets) && Array.isArray(parsed.transactions)) {
-        return normalizeState(parsed);
+async function loadStateAsync() {
+  try {
+    const saved = await getStoredState();
+    if (saved && Array.isArray(saved.budgets) && Array.isArray(saved.transactions)) {
+      state = normalizeState(saved);
+    } else {
+      const legacy = localStorage.getItem(STORAGE_KEY);
+      if (legacy) {
+        try {
+          const parsed = JSON.parse(legacy);
+          state = normalizeState(parsed);
+          await setStoredState(state);
+        } catch {
+          state = createInitialState();
+        }
+      } else {
+        const migrated = migrateLegacyState();
+        state = migrated || createInitialState();
+        await setStoredState(state);
       }
-    } catch {
-      showEarlyError("Saved finance data could not be loaded.");
     }
+  } catch (err) {
+    showEarlyError("Saved data could not be loaded from database.");
+    state = createInitialState();
   }
-  return migrateLegacyState() || createInitialState();
 }
 
 function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    throw new Error(
-      "Storage is full. Remove a large receipt photo or export a backup before adding more data.",
-    );
-  }
+  setStoredState(state).catch((err) => {
+    showToast("Database storage limit reached. Please backup and clean up files.");
+  });
 }
 
 function normalizeState(input) {
@@ -214,8 +283,12 @@ function normalizeState(input) {
   const activeBudgetId = budgets.some((b) => b.id === input.activeBudgetId)
     ? input.activeBudgetId
     : budgets[0].id;
+  const preferredCurrency = input.preferredCurrency || "INR";
+  const themePreference = input.themePreference || "system";
   return {
     activeBudgetId,
+    preferredCurrency,
+    themePreference,
     budgets: budgets.map((b) => ({
       id: b.id || uid("budget"),
       name: b.name || "Budget",
@@ -281,6 +354,8 @@ function migrateLegacyState() {
 function createInitialState() {
   return {
     activeBudgetId: "personal",
+    preferredCurrency: "INR",
+    themePreference: "system",
     budgets: defaultBudgets(),
     categories: defaultCategories(),
     transactions: [],
@@ -532,6 +607,7 @@ function render() {
   renderAnalytics();
   renderBudgets();
   renderCategories();
+  updateStorageUsageEstimate();
 }
 
 function renderSelectors() {
@@ -560,6 +636,9 @@ function renderSelectors() {
       .join("");
   elements.categoryFilter.value = filters.categoryId;
 
+  if (elements.themeSelect) elements.themeSelect.value = state.themePreference || "system";
+  if (elements.currencySelect) elements.currencySelect.value = state.preferredCurrency || "INR";
+
   renderTransactionCategoryOptions(elements.transactionType.value || "expense");
 }
 
@@ -576,14 +655,10 @@ function renderHome() {
   elements.totalIncome.textContent = formatINR(totals.income);
   elements.totalExpenses.textContent = formatINR(totals.expenses);
 
-  elements.budgetOverview.innerHTML = state.budgets
-    .map((b) => budgetCardHtml(b, true))
-    .join("");
-
-  const recent = state.transactions.slice(0, 5);
-  elements.recentTransactions.innerHTML = recent.length
-    ? recent.map(transactionHtml).join("")
-    : emptyState("No recent transactions yet.");
+  const selectedBudget = getBudget(state.activeBudgetId);
+  elements.budgetOverview.innerHTML = selectedBudget
+    ? budgetCardHtml(selectedBudget, true)
+    : emptyState("No active budget selected.");
 }
 
 function renderTransactions() {
@@ -721,15 +796,17 @@ function renderExpenseChart(transactions) {
 
   const total = sum(categoryTotals.map((c) => c.total));
 
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+
   if (!total) {
     // Draw empty ring
     ctx.lineWidth = LINE_W;
-    ctx.strokeStyle = "#dfeae7";
+    ctx.strokeStyle = isDark ? "#293d3a" : "#dfeae7";
     ctx.beginPath();
     ctx.arc(CX, CY, RADIUS, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = "#62716e";
+    ctx.fillStyle = isDark ? "#8fa39f" : "#62716e";
     ctx.font = `bold ${W * 0.05}px Inter, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -759,7 +836,7 @@ function renderExpenseChart(transactions) {
   });
 
   // Centre text
-  ctx.fillStyle = "#14211f";
+  ctx.fillStyle = isDark ? "#e5edea" : "#14211f";
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.font = `700 ${W * 0.05}px Inter, sans-serif`;
@@ -900,16 +977,36 @@ async function saveTransactionFromForm() {
 }
 
 function readReceipt(file) {
-  if (file.size > MAX_RECEIPT_BYTES) {
-    return Promise.reject(
-      new Error("Receipt photo is too large. Please choose an image under 3 MB."),
-    );
+  if (file.type && !file.type.startsWith("image/")) {
+    return Promise.reject(new Error("File is not an image."));
   }
-
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve({ receiptName: file.name, receiptData: reader.result });
-    reader.onerror = () => reject(new Error("Receipt could not be read."));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const MAX_WIDTH = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedData = canvas.toDataURL("image/jpeg", 0.7);
+        resolve({ receiptName: file.name, receiptData: compressedData });
+      };
+      img.onerror = () => reject(new Error("Failed to load image for compression."));
+    };
+    reader.onerror = () => reject(new Error("Failed to read image file."));
     reader.readAsDataURL(file);
   });
 }
@@ -971,6 +1068,15 @@ function saveCategoryFromForm() {
 function getExportRows() {
   const txs = getFilteredTransactions();
   const totals = calculateGlobalTotals(txs);
+  
+  let limit = 0;
+  if (filters.budgetIds.length === 1) {
+    limit = getBudget(filters.budgetIds[0]).limit;
+  } else {
+    limit = sum(state.budgets.filter((b) => !b.archived).map((b) => b.limit));
+  }
+  totals.limit = limit;
+
   const rows = txs.map((t) => ({
     title: t.description,
     amount: t.type === "income" ? t.amount : -t.amount,
@@ -994,6 +1100,7 @@ function exportCsv() {
     ["Metric", "Value"],
     ["Total Income", totals.income.toFixed(2)],
     ["Total Expenses", totals.expenses.toFixed(2)],
+    ["Budget Limit", totals.limit.toFixed(2)],
     ["Net Balance", totals.balance.toFixed(2)],
     [],
     ["TRANSACTIONS"],
@@ -1026,13 +1133,14 @@ function exportXlsx() {
     ["Metric", "Value"],
     ["Total Income", totals.income],
     ["Total Expenses", totals.expenses],
+    ["Budget Limit", totals.limit],
     ["Net Balance", totals.balance],
     [],
     ["TRANSACTIONS"],
     ["Date & Time", "Title", "Type", "Category", "Budget", "Amount", "Notes"],
     ...rows.map((r) => [r.dateTime, r.title, r.type, r.category, r.budget, r.amount, r.notes]),
   ];
-  const boldIndices = new Set([0, 3, 4, 9, 10]);
+  const boldIndices = new Set([0, 3, 4, 10, 11]);
   const sheetRows = data
     .map((row, ri) => {
       const isBold = boldIndices.has(ri);
@@ -1138,6 +1246,11 @@ function pdfPageTable(rows, totals, page, totalPages) {
   y -= 10;
   commands.push("BT /F1 9 Tf");
   commands.push(`1 0 0 1 36 ${y} Tm (Total Expenses: ${exportAmount(totals.expenses)}) Tj`);
+  commands.push("ET");
+
+  y -= 10;
+  commands.push("BT /F1 9 Tf");
+  commands.push(`1 0 0 1 36 ${y} Tm (Budget Limit: ${exportAmount(totals.limit)}) Tj`);
   commands.push("ET");
 
   y -= 10;
@@ -1253,6 +1366,67 @@ function showToast(message) {
     () => elements.toast.classList.remove("show"),
     2400
   );
+}
+
+async function updateStorageUsageEstimate() {
+  if (navigator.storage && navigator.storage.estimate && elements.storageUsage) {
+    try {
+      const estimate = await navigator.storage.estimate();
+      const usedKB = Math.round(estimate.usage / 1024);
+      if (usedKB > 1024) {
+        elements.storageUsage.textContent = `Storage usage: ${(usedKB / 1024).toFixed(2)} MB`;
+      } else {
+        elements.storageUsage.textContent = `Storage usage: ${usedKB} KB`;
+      }
+    } catch {
+      elements.storageUsage.textContent = "Storage usage: Unknown";
+    }
+  } else if (elements.storageUsage) {
+    elements.storageUsage.textContent = "Storage usage: Estimate not available";
+  }
+}
+
+function initTheme() {
+  const theme = state.themePreference || "system";
+  applyTheme(theme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme-preference", theme);
+  if (theme === "system") {
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+  } else {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+  // If analytics canvas is rendered, redraw to apply theme colors!
+  if (activeView === "analytics") {
+    renderAnalytics();
+  }
+}
+
+async function resetAllApplicationData() {
+  if (!confirm("Are you sure you want to completely RESET ALL DATA?\n\nThis will permanently delete all budgets, transactions, categories, and settings. This cannot be undone!")) return;
+  try {
+    setLoading(true);
+    const db = await openDB();
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    await new Promise((resolve, reject) => {
+      const req = store.clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+    localStorage.removeItem(STORAGE_KEY);
+    state = createInitialState();
+    initTheme();
+    render();
+    showToast("Application completely reset");
+  } catch (err) {
+    showToast("Reset failed: " + err.message);
+  } finally {
+    setLoading(false);
+  }
 }
 
 // ── Low-level helpers ──────────────────────────────────────────────────────────
@@ -1509,6 +1683,27 @@ elements.transactionType.addEventListener("change", () =>
   renderTransactionCategoryOptions(elements.transactionType.value)
 );
 
+elements.themeSelect.addEventListener("change", () => {
+  state.themePreference = elements.themeSelect.value;
+  saveState();
+  applyTheme(state.themePreference);
+});
+
+elements.currencySelect.addEventListener("change", () => {
+  state.preferredCurrency = elements.currencySelect.value;
+  saveState();
+  render();
+  showToast("Base currency updated");
+});
+
+elements.resetAllDataButton.addEventListener("click", resetAllApplicationData);
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (state.themePreference === "system") {
+    applyTheme("system");
+  }
+});
+
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
@@ -1533,6 +1728,9 @@ if ("serviceWorker" in navigator) {
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
 
-sortTransactions();
-saveState();
-render();
+(async function boot() {
+  await loadStateAsync();
+  initTheme();
+  sortTransactions();
+  render();
+})();

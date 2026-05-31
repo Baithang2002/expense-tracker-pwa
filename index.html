@@ -22,7 +22,7 @@
         </div>
         <div class="header-actions">
           <button class="icon-button" id="searchToggle" type="button" aria-label="Search transactions" title="Search">⌕</button>
-          <button class="icon-button" id="installButton" type="button" hidden aria-label="Install app" title="Install">+</button>
+          <button class="soft-button" id="installButton" type="button" hidden aria-label="Install app">Install</button>
         </div>
       </header>
 
@@ -65,13 +65,7 @@
           <div class="budget-overview" id="budgetOverview"></div>
         </section>
 
-        <section class="panel">
-          <div class="section-title">
-            <h2>Recent Transactions</h2>
-            <button class="soft-button" type="button" data-nav="transactions">View All</button>
-          </div>
-          <div class="transaction-list compact" id="recentTransactions"></div>
-        </section>
+
       </section>
 
       <!-- ── TRANSACTIONS ───────────────────────────────── -->
@@ -198,6 +192,34 @@
 
         <section class="panel">
           <div class="section-title">
+            <h2>Preferences</h2>
+          </div>
+          <div class="settings-grid">
+            <label>
+              <span>Theme Preference</span>
+              <select id="themeSelect">
+                <option value="system">Follow System</option>
+                <option value="light">Light Theme</option>
+                <option value="dark">Dark Theme</option>
+              </select>
+            </label>
+            <label>
+              <span>Preferred Currency</span>
+              <select id="currencySelect">
+                <option value="INR">Indian Rupee (₹)</option>
+                <option value="USD">US Dollar ($)</option>
+                <option value="EUR">Euro (€)</option>
+                <option value="GBP">British Pound (£)</option>
+                <option value="JPY">Japanese Yen (¥)</option>
+                <option value="AUD">Australian Dollar ($)</option>
+              </select>
+            </label>
+          </div>
+          <div style="margin-top: 14px;" class="muted" id="storageUsage">Storage usage: Calculating…</div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
             <h2>Backup &amp; Restore</h2>
           </div>
           <div class="settings-grid">
@@ -210,9 +232,12 @@
         </section>
 
         <section class="panel danger-panel">
-          <h2>Reset Budget</h2>
-          <p>Clear all transactions for the currently selected budget. Budget and category settings will be kept.</p>
-          <button class="danger-button" type="button" id="resetBudgetButton">Reset Selected Budget</button>
+          <h2>Danger Zone</h2>
+          <p>Wipe single budget transactions or perform a complete application reset.</p>
+          <div class="settings-grid">
+            <button class="danger-button" type="button" id="resetBudgetButton">Reset Selected Budget</button>
+            <button class="danger-button" type="button" id="resetAllDataButton" style="background:#b91c1c;">Reset All Data</button>
+          </div>
         </section>
       </section>
     </main>
