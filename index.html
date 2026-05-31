@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme-preference="system">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#176b5d">
+    <meta name="theme-color" content="#059669">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Finance Manager">
@@ -15,356 +15,396 @@
   </head>
   <body>
     <main class="app-shell">
+      
       <header class="app-header">
-        <div>
-          <p class="eyebrow">Personal Finance</p>
+        <div class="brand-group">
+          <p class="eyebrow">My Wallet</p>
           <h1>Finance Manager</h1>
         </div>
         <div class="header-actions">
-          <button class="icon-button" id="searchToggle" type="button" aria-label="Search transactions" title="Search">⌕</button>
-          <button class="soft-button" id="installButton" type="button" hidden aria-label="Install app">Install</button>
+          <button class="icon-button ghost" id="searchToggle" type="button" aria-label="Search transactions" title="Search">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+          <button class="action-badge-btn" id="installButton" type="button" hidden>Install App</button>
         </div>
       </header>
 
       <section class="search-panel" id="searchPanel" hidden>
-        <label>
-          <span>Search by name, category, or amount</span>
-          <input id="globalSearch" type="search" placeholder="Search transactions…">
-        </label>
+        <div class="search-input-wrapper">
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="globalSearch" type="search" placeholder="Search by description, tags, notes, or amount..." aria-label="Search transactions">
+        </div>
       </section>
 
-      <!-- ── HOME ───────────────────────────────────────── -->
       <section class="view active" id="homeView" data-view="home">
         <div class="dashboard-grid">
           <article class="metric-card balance-card">
-            <span>Current Balance</span>
+            <div class="card-glow"></div>
+            <span>Net Balance</span>
             <strong id="currentBalance">₹0.00</strong>
           </article>
-          <article class="metric-card">
+          <article class="metric-card income-card">
             <span>Total Income</span>
             <strong class="income-text" id="totalIncome">₹0.00</strong>
           </article>
-          <article class="metric-card">
+          <article class="metric-card expense-card">
             <span>Total Expenses</span>
             <strong class="expense-text" id="totalExpenses">₹0.00</strong>
           </article>
         </div>
 
-        <section class="quick-actions">
-          <button type="button" data-open-transaction="income">Add Income</button>
-          <button type="button" data-open-transaction="expense">Add Expense</button>
-          <button type="button" data-open-budget>Create Budget</button>
-          <button type="button" data-nav="analytics">View Analytics</button>
+        <section class="quick-actions-bar">
+          <button type="button" class="btn-primary" data-open-transaction="income">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Income
+          </button>
+          <button type="button" class="btn-secondary" data-open-transaction="expense">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add Expense
+          </button>
+          <button type="button" class="btn-outline" data-open-budget>Set Budget</button>
+          <button type="button" class="btn-outline" data-nav="analytics">View Analytics</button>
         </section>
 
-        <section class="panel">
+        <section class="panel-card">
           <div class="section-title">
-            <h2>Budget Overview</h2>
-            <select id="activeBudgetSelect" aria-label="Switch budget"></select>
+            <h2>Budget Tracking</h2>
+            <div class="select-wrapper">
+              <select id="activeBudgetSelect" aria-label="Switch active budget"></select>
+            </div>
           </div>
-          <div class="budget-overview" id="budgetOverview"></div>
+          <div class="budget-overview-container" id="budgetOverview"></div>
         </section>
-
-
       </section>
 
-      <!-- ── TRANSACTIONS ───────────────────────────────── -->
       <section class="view" id="transactionsView" data-view="transactions">
-        <section class="panel">
-          <div class="section-title wrap">
-            <h2>Transactions</h2>
+        <section class="panel-card navigation-filter-dock">
+          <div class="section-title">
+            <h2>Filter Transactions</h2>
           </div>
 
-          <div class="filter-grid">
-            <!-- Segmented type tabs span full width via CSS -->
-            <div class="segmented" id="typeTabs" role="tablist" aria-label="Transaction type">
-              <button type="button" data-type-filter="all" class="active">All</button>
-              <button type="button" data-type-filter="income">Income</button>
-              <button type="button" data-type-filter="expense">Expenses</button>
+          <div class="filter-controls-grid">
+            <div class="segmented-control" id="typeTabs" role="tablist" aria-label="Filter by Type">
+              <button type="button" data-type-filter="all" class="active" role="tab" aria-selected="true">All</button>
+              <button type="button" data-type-filter="income" role="tab" aria-selected="false">Income</button>
+              <button type="button" data-type-filter="expense" role="tab" aria-selected="false">Expenses</button>
             </div>
-            <label>
-              <span>Quick time</span>
+            
+            <div class="form-field">
+              <label for="quickFilter">Time Period</label>
               <select id="quickFilter">
                 <option value="all">All Time</option>
-                <option value="7">Last 7 Days</option>
-                <option value="30">Last 30 Days</option>
-                <option value="90">Last 90 Days</option>
+                <option value="7">Past 7 Days</option>
+                <option value="30">Past 30 Days</option>
+                <option value="90">Past 90 Days</option>
                 <option value="year">This Year</option>
               </select>
-            </label>
-            <label>
-              <span>Category</span>
+            </div>
+            
+            <div class="form-field">
+              <label for="categoryFilter">Category</label>
               <select id="categoryFilter"></select>
-            </label>
-            <label>
-              <span>Budget</span>
+            </div>
+            
+            <div class="form-field">
+              <label for="budgetFilter">Budget</label>
               <select id="budgetFilter"></select>
-            </label>
-            <label>
-              <span>From</span>
+            </div>
+            
+            <div class="form-field">
+              <label for="fromDate">Start Date</label>
               <input id="fromDate" type="datetime-local">
-            </label>
-            <label>
-              <span>To</span>
+            </div>
+            
+            <div class="form-field">
+              <label for="toDate">End Date</label>
               <input id="toDate" type="datetime-local">
-            </label>
+            </div>
           </div>
 
-          <div class="export-row">
-            <button class="soft-button" type="button" id="clearFilters">Clear Filters</button>
-            <button class="soft-button" type="button" data-export="csv">CSV</button>
-            <button class="soft-button" type="button" data-export="xlsx">Excel</button>
-            <button class="soft-button" type="button" data-export="pdf">PDF</button>
+          <div class="export-actions-wrapper">
+            <button class="btn-text-danger" type="button" id="clearFilters">Reset Filters</button>
+            <div class="button-group">
+              <button class="btn-secondary-sm" type="button" data-export="csv">Export CSV</button>
+              <button class="btn-secondary-sm" type="button" data-export="xlsx">Export Excel</button>
+              <button class="btn-secondary-sm" type="button" data-export="pdf">Export PDF</button>
+            </div>
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel-card">
           <div class="section-title">
-            <h2>History</h2>
-            <span class="muted" id="filteredCount">0 transactions</span>
+            <h2>Transaction History</h2>
+            <span class="badge-status-neutral" id="filteredCount">0 transactions</span>
           </div>
-          <div class="transaction-list" id="transactionList"></div>
+          <div class="transaction-timeline-list" id="transactionList"></div>
         </section>
       </section>
 
-      <!-- ── ANALYTICS ──────────────────────────────────── -->
       <section class="view" id="analyticsView" data-view="analytics">
-        <section class="panel">
+        <section class="panel-card">
           <div class="section-title">
-            <h2>Analytics</h2>
-            <select id="analyticsBudgetSelect" aria-label="Analytics budget"></select>
+            <h2>Analytics Summary</h2>
+            <div class="select-wrapper">
+              <select id="analyticsBudgetSelect" aria-label="Select Budget"></select>
+            </div>
           </div>
-          <div class="analytics-grid">
-            <article class="metric-card">
-              <span>Income</span>
+          <div class="analytics-metrics-strip">
+            <article class="sub-metric-card">
+              <span>Total Income</span>
               <strong class="income-text" id="analyticsIncome">₹0.00</strong>
             </article>
-            <article class="metric-card">
-              <span>Expenses</span>
+            <article class="sub-metric-card">
+              <span>Total Expenses</span>
               <strong class="expense-text" id="analyticsExpense">₹0.00</strong>
             </article>
-            <article class="metric-card">
-              <span>Net</span>
+            <article class="sub-metric-card">
+              <span>Net Savings</span>
               <strong id="analyticsNet">₹0.00</strong>
             </article>
           </div>
         </section>
 
-        <section class="panel">
-          <div class="section-title">
-            <h2>Expense Breakdown</h2>
-            <span class="muted" id="chartHint">Tap chart segment for details</span>
+        <section class="panel-card chart-analysis-grid">
+          <div class="chart-box">
+            <div class="section-title">
+              <h2>Expenses by Category</h2>
+              <span class="caption-muted" id="chartHint">Tap segments to see category totals</span>
+            </div>
+            <div class="canvas-viewport">
+              <canvas id="expenseChart" width="360" height="360" aria-label="Category Expenses Chart"></canvas>
+            </div>
           </div>
-          <div class="chart-layout">
-            <canvas id="expenseChart" width="320" height="320" aria-label="Expense category chart"></canvas>
-            <div class="category-breakdown" id="categoryBreakdown"></div>
+          <div class="breakdown-box">
+            <div class="section-title"><h2>Breakdown</h2></div>
+            <div class="category-breakdown-panel" id="categoryBreakdown"></div>
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel-card">
           <div class="section-title">
-            <h2>Monthly Summary</h2>
+            <h2>Monthly Trends</h2>
           </div>
-          <div class="bars" id="monthlyBars"></div>
+          <div class="monthly-delta-bars" id="monthlyBars"></div>
         </section>
       </section>
 
-      <!-- ── BUDGETS ─────────────────────────────────────── -->
       <section class="view" id="budgetsView" data-view="budgets">
-        <section class="panel">
+        <section class="panel-card">
           <div class="section-title">
-            <h2>Budgets</h2>
-            <button type="button" data-open-budget>+ Create Budget</button>
+            <h2>Manage Budgets</h2>
+            <button type="button" class="btn-primary" data-open-budget>+ Create New Budget</button>
           </div>
-          <div class="budget-grid" id="budgetCards"></div>
+          <div class="dynamic-budget-cards-grid" id="budgetCards"></div>
         </section>
       </section>
 
-      <!-- ── SETTINGS ───────────────────────────────────── -->
       <section class="view" id="settingsView" data-view="settings">
-        <section class="panel">
+        <section class="panel-card">
           <div class="section-title">
-            <h2>Categories</h2>
-            <button type="button" id="openCategoryButton">+ Add Category</button>
+            <h2>Manage Categories</h2>
+            <button type="button" class="btn-secondary" id="openCategoryButton">+ Add New Category</button>
           </div>
-          <div class="category-grid" id="categoryCards"></div>
+          <div class="dynamic-category-cards-grid" id="categoryCards"></div>
         </section>
 
-        <section class="panel">
+        <section class="panel-card">
           <div class="section-title">
             <h2>Preferences</h2>
           </div>
-          <div class="settings-grid">
-            <label>
-              <span>Theme Preference</span>
+          <div class="modular-input-form-grid">
+            <div class="form-field">
+              <label for="themeSelect">App Theme</label>
               <select id="themeSelect">
-                <option value="system">Follow System</option>
-                <option value="light">Light Theme</option>
-                <option value="dark">Dark Theme</option>
+                <option value="system">System Default</option>
+                <option value="light">Light Mode</option>
+                <option value="dark">Dark Mode</option>
               </select>
-            </label>
-            <label>
-              <span>Preferred Currency</span>
+            </div>
+            <div class="form-field">
+              <label for="currencySelect">Preferred Currency</label>
               <select id="currencySelect">
-                <option value="INR">Indian Rupee (₹)</option>
-                <option value="USD">US Dollar ($)</option>
-                <option value="EUR">Euro (€)</option>
-                <option value="GBP">British Pound (£)</option>
-                <option value="JPY">Japanese Yen (¥)</option>
-                <option value="AUD">Australian Dollar ($)</option>
+                <option value="INR">Indian Rupee (INR, ₹)</option>
+                <option value="USD">United States Dollar (USD, $)</option>
+                <option value="EUR">Eurozone Euro (EUR, €)</option>
+                <option value="GBP">Great Britain Pound Sterling (GBP, £)</option>
+                <option value="JPY">Japanese Yen (JPY, ¥)</option>
+                <option value="AUD">Australian Dollar (AUD, $)</option>
               </select>
-            </label>
+            </div>
           </div>
-          <div style="margin-top: 14px;" class="muted" id="storageUsage">Storage usage: Calculating…</div>
+          <div class="disk-quota-telemetry-stamp" id="storageUsage">Storage usage: Calculating...</div>
         </section>
 
-        <section class="panel">
+        <section class="panel-card">
           <div class="section-title">
-            <h2>Backup &amp; Restore</h2>
+            <h2>Backup & Restore</h2>
           </div>
-          <div class="settings-grid">
-            <button class="soft-button" type="button" id="backupButton">Export Backup</button>
-            <label class="file-button">
-              Restore Backup
+          <div class="modular-input-form-grid">
+            <button class="btn-outline" type="button" id="backupButton">Export Backup</button>
+            <label class="file-dropzone-button-label">
+              Import Backup
               <input id="restoreInput" type="file" accept="application/json">
             </label>
           </div>
         </section>
 
-        <section class="panel danger-panel">
-          <h2>Danger Zone</h2>
-          <p>Wipe single budget transactions or perform a complete application reset.</p>
-          <div class="settings-grid">
-            <button class="danger-button" type="button" id="resetBudgetButton">Reset Selected Budget</button>
-            <button class="danger-button" type="button" id="resetAllDataButton" style="background:#b91c1c;">Reset All Data</button>
+        <section class="panel-card destructive-action-zone">
+          <div class="destructive-header">
+            <h2>Danger Zone</h2>
+            <p>Wiping data will permanently delete all records and cannot be undone.</p>
+          </div>
+          <div class="modular-input-form-grid">
+            <button class="danger-button-outline" type="button" id="resetBudgetButton">Clear Selected Budget Data</button>
+            <button class="danger-button-solid" type="button" id="resetAllDataButton">Reset All App Data</button>
           </div>
         </section>
       </section>
     </main>
 
-    <nav class="bottom-nav" aria-label="Main navigation">
-      <button class="active" type="button" data-nav="home">⌂<span>Home</span></button>
-      <button type="button" data-nav="transactions">≡<span>Transactions</span></button>
-      <button type="button" data-nav="analytics">◔<span>Analytics</span></button>
-      <button type="button" data-nav="budgets">▦<span>Budgets</span></button>
-      <button type="button" data-nav="settings">⚙<span>Settings</span></button>
+    <nav class="system-navigation-hub" aria-label="Main navigation">
+      <button class="active" type="button" data-nav="home">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        <span>Home</span>
+      </button>
+      <button type="button" data-nav="transactions">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+        <span>Transactions</span>
+      </button>
+      <button type="button" data-nav="analytics">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        <span>Analytics</span>
+      </button>
+      <button type="button" data-nav="budgets">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+        <span>Budgets</span>
+      </button>
+      <button type="button" data-nav="settings">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>Settings</span>
+      </button>
     </nav>
 
-    <!-- ── TRANSACTION DIALOG ──────────────────────────── -->
     <dialog id="transactionDialog">
-      <form id="transactionForm" class="dialog-form">
-        <div class="section-title">
+      <form id="transactionForm" class="modal-form-scroller">
+        <div class="modal-header-container">
           <h2 id="transactionDialogTitle">Add Transaction</h2>
-          <button class="icon-button ghost" type="button" id="closeTransactionDialog" aria-label="Close">×</button>
+          <button class="close-modal-icon-btn" type="button" id="closeTransactionDialog" aria-label="Close dialog">✕</button>
         </div>
         <input id="transactionId" type="hidden">
         <input id="transactionType" type="hidden">
-        <label>
-          <span>Amount (₹)</span>
-          <input id="transactionAmount" inputmode="decimal" placeholder="1250" required>
-        </label>
-        <label>
-          <span>Description</span>
-          <input id="transactionDescription" placeholder="Salary, groceries, train ticket…" required>
-        </label>
-        <label>
-          <span>Date &amp; Time</span>
+        
+        <div class="form-field focus-highlight-group">
+          <label for="transactionAmount">Amount ($ / ₹ / €)</label>
+          <input id="transactionAmount" inputmode="decimal" placeholder="0.00" required autocomplete="off">
+        </div>
+        <div class="form-field">
+          <label for="transactionDescription">Description</label>
+          <input id="transactionDescription" placeholder="e.g. Groceries, Rent, Salary..." required>
+        </div>
+        <div class="form-field">
+          <label for="transactionDateTime">Date & Time</label>
           <input id="transactionDateTime" type="datetime-local" required>
-        </label>
-        <label>
-          <span>Budget</span>
-          <select id="transactionBudget" required></select>
-        </label>
-        <label>
-          <span>Category</span>
-          <select id="transactionCategory" required></select>
-        </label>
-        <label>
-          <span>Notes</span>
-          <textarea id="transactionNotes" rows="2" placeholder="Optional notes…"></textarea>
-        </label>
-        <label>
-          <span>Receipt / Photo</span>
-          <input id="transactionReceipt" type="file" accept="image/*">
-        </label>
-        <div class="dialog-actions">
-          <button class="soft-button" type="button" id="cancelTransactionButton">Cancel</button>
-          <button type="button" id="saveTransactionButton">Save Transaction</button>
+        </div>
+        <div class="split-input-row">
+          <div class="form-field">
+            <label for="transactionBudget">Budget Group</label>
+            <select id="transactionBudget" required></select>
+          </div>
+          <div class="form-field">
+            <label for="transactionCategory">Category</label>
+            <select id="transactionCategory" required></select>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="transactionNotes">Notes (Optional)</label>
+          <textarea id="transactionNotes" rows="2" placeholder="Add any extra details..."></textarea>
+        </div>
+        <div class="form-field file-input-premium-wrapper">
+          <label>Receipt Attachment</label>
+          <div class="dropzone-area">
+            <input id="transactionReceipt" type="file" accept="image/*">
+            <span class="dropzone-prompt">Upload receipt photo here</span>
+          </div>
+        </div>
+        <div class="modal-actions-tray">
+          <button class="btn-text" type="button" id="cancelTransactionButton">Cancel</button>
+          <button class="btn-primary" type="button" id="saveTransactionButton">Save Transaction</button>
         </div>
       </form>
     </dialog>
 
-    <!-- ── BUDGET DIALOG ───────────────────────────────── -->
     <dialog id="budgetDialog">
-      <form id="budgetForm" class="dialog-form">
-        <div class="section-title">
+      <form id="budgetForm" class="modal-form-scroller">
+        <div class="modal-header-container">
           <h2 id="budgetDialogTitle">Create Budget</h2>
-          <button class="icon-button ghost" type="button" id="closeBudgetDialog" aria-label="Close">×</button>
+          <button class="close-modal-icon-btn" type="button" id="closeBudgetDialog" aria-label="Close dialog">✕</button>
         </div>
         <input id="budgetId" type="hidden">
-        <label>
-          <span>Budget Name</span>
-          <input id="budgetName" placeholder="Travel Budget" required>
-        </label>
-        <label>
-          <span>Opening Balance / Budget Limit</span>
-          <input id="budgetLimit" inputmode="decimal" placeholder="25000" required>
-        </label>
-        <div class="dialog-actions">
-          <button class="soft-button" type="button" id="cancelBudgetButton">Cancel</button>
-          <button type="button" id="saveBudgetButton">Save Budget</button>
+        <div class="form-field">
+          <label for="budgetName">Budget Name</label>
+          <input id="budgetName" placeholder="e.g. Monthly Rent, Personal Spending..." required>
+        </div>
+        <div class="form-field">
+          <label for="budgetLimit">Monthly Limit</label>
+          <input id="budgetLimit" inputmode="decimal" placeholder="0.00" required>
+        </div>
+        <div class="modal-actions-tray">
+          <button class="btn-text" type="button" id="cancelBudgetButton">Cancel</button>
+          <button class="btn-primary" type="button" id="saveBudgetButton">Save Budget</button>
         </div>
       </form>
     </dialog>
 
-    <!-- ── CATEGORY DIALOG ────────────────────────────── -->
     <dialog id="categoryDialog">
-      <form id="categoryForm" class="dialog-form">
-        <div class="section-title">
-          <h2 id="categoryDialogTitle">Category</h2>
-          <button class="icon-button ghost" type="button" id="closeCategoryDialog" aria-label="Close">×</button>
+      <form id="categoryForm" class="modal-form-scroller">
+        <div class="modal-header-container">
+          <h2 id="categoryDialogTitle">Create Category</h2>
+          <button class="close-modal-icon-btn" type="button" id="closeCategoryDialog" aria-label="Close dialog">✕</button>
         </div>
         <input id="categoryId" type="hidden">
-        <label>
-          <span>Name</span>
-          <input id="categoryName" placeholder="Groceries" required>
-        </label>
-        <label>
-          <span>Type</span>
+        <div class="form-field">
+          <label for="categoryName">Category Name</label>
+          <input id="categoryName" placeholder="e.g. Dining Out, Utilities..." required>
+        </div>
+        <div class="form-field">
+          <label for="categoryType">Category Type</label>
           <select id="categoryType">
-            <option value="both">Income &amp; Expense</option>
+            <option value="both">Both (Income & Expense)</option>
             <option value="income">Income Only</option>
             <option value="expense">Expense Only</option>
           </select>
-        </label>
-        <label>
-          <span>Icon (emoji or symbol)</span>
-          <input id="categoryIcon" maxlength="3" placeholder="●" required>
-        </label>
-        <label>
-          <span>Color</span>
-          <input id="categoryColor" type="color" value="#176b5d" style="min-height:52px;padding:6px;">
-        </label>
-        <div class="dialog-actions">
-          <button class="soft-button" type="button" id="cancelCategoryButton">Cancel</button>
-          <button type="button" id="saveCategoryButton">Save Category</button>
+        </div>
+        <div class="split-input-row">
+          <div class="form-field">
+            <label for="categoryIcon">Icon</label>
+            <input id="categoryIcon" maxlength="3" placeholder="●" required>
+          </div>
+          <div class="form-field">
+            <label for="categoryColor">Color</label>
+            <input id="categoryColor" type="color" value="#059669">
+          </div>
+        </div>
+        <div class="modal-actions-tray">
+          <button class="btn-text" type="button" id="cancelCategoryButton">Cancel</button>
+          <button class="btn-primary" type="button" id="saveCategoryButton">Save Category</button>
         </div>
       </form>
     </dialog>
 
-    <!-- ── RECEIPT VIEWER ────────────────────────────── -->
     <dialog id="receiptDialog">
-      <div class="receipt-viewer">
-        <div class="receipt-header">
-          <h2>Receipt / Photo</h2>
-          <button class="icon-button ghost" type="button" id="closeReceiptDialog" aria-label="Close">×</button>
+      <div class="forensic-image-viewer-container">
+        <div class="modal-header-container">
+          <h2>Receipt Viewer</h2>
+          <button class="close-modal-icon-btn" type="button" id="closeReceiptDialog" aria-label="Close overlay">✕</button>
         </div>
-        <img id="receiptImage" src="" alt="Receipt photo" class="receipt-image">
+        <div class="image-projection-workspace">
+          <img id="receiptImage" src="" alt="Receipt Photo">
+        </div>
       </div>
     </dialog>
 
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <div id="loading" class="loading" hidden>Saving…</div>
+    <div id="toast" class="system-notification-toast" role="status" aria-live="polite"></div>
+    <div id="loading" class="system-blocking-progress-spinner" hidden></div>
+    
     <script src="app.js" defer></script>
   </body>
 </html>

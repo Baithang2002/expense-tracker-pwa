@@ -1,6 +1,12 @@
-const STORAGE_KEY = "finance-manager-v1";
-const LEGACY_KEY = "expense-tracker-state-v1";
-const MAX_RECEIPT_BYTES = 3_000_000;
+/**
+ * FINANCE MANAGER - PRO EDITION CORE ENGINE
+ * Complete Framework Restructuring featuring Reactive Proxies & Atomic Render Pipes
+ */
+
+const STORAGE_KEY = "finance-manager-v2-state";
+const DB_NAME = "FinanceManagerDB_Pro";
+const DB_VERSION = 2;
+const STORE_NAME = "operationalStateStore";
 
 const CURRENCY_FORMATS = {
   INR: { locale: "en-IN", currency: "INR" },
@@ -11,81 +17,10 @@ const CURRENCY_FORMATS = {
   AUD: { locale: "en-AU", currency: "AUD" },
 };
 
-function getCurrencyFormatter() {
-  const code = state?.preferredCurrency || "INR";
-  const cfg = CURRENCY_FORMATS[code] || CURRENCY_FORMATS.INR;
-  return new Intl.NumberFormat(cfg.locale, {
-    style: "currency",
-    currency: cfg.currency,
-    maximumFractionDigits: 2,
-  });
-}
-
-const DB_NAME = "FinanceManagerDB";
-const DB_VERSION = 1;
-const STORE_NAME = "stateStore";
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-    };
-    request.onsuccess = (e) => resolve(e.target.result);
-    request.onerror = (e) => reject(e.target.error);
-  });
-}
-
-function getStoredState() {
-  return openDB().then((db) => {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, "readonly");
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.get("appState");
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  });
-}
-
-function setStoredState(data) {
-  return openDB().then((db) => {
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, "readwrite");
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.put(data, "appState");
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  });
-}
-
-const DEFAULT_BUDGETS = [
-  ["personal", "Personal Budget", 0],
-  ["family", "Family Budget", 0],
-  ["savings", "Savings Budget", 0],
-  ["travel", "Travel Budget", 0],
-  ["emergency", "Emergency Budget", 0],
-];
-
-const DEFAULT_CATEGORIES = [
-  ["food", "Food", "expense", "🍽", "#e66a3f"],
-  ["shopping", "Shopping", "expense", "🛍", "#8b5cf6"],
-  ["bills", "Bills", "expense", "⚡", "#f59e0b"],
-  ["transport", "Transport", "expense", "🚌", "#0ea5e9"],
-  ["healthcare", "Healthcare", "expense", "✚", "#ef4444"],
-  ["entertainment", "Entertainment", "expense", "▶", "#ec4899"],
-  ["salary", "Salary", "income", "₹", "#16a34a"],
-  ["savings", "Savings", "income", "◆", "#0f766e"],
-  ["others", "Others", "both", "●", "#64748b"],
-];
-
+// Isolated Application Elements Selection Map
 const elements = {
   views: document.querySelectorAll(".view"),
-  navButtons: document.querySelectorAll("[data-nav]"),
+  navButtons: document.querySelectorAll(".system-navigation-hub [data-nav]"),
   searchToggle: document.querySelector("#searchToggle"),
   searchPanel: document.querySelector("#searchPanel"),
   globalSearch: document.querySelector("#globalSearch"),
@@ -150,16 +85,20 @@ const elements = {
   categoryIcon: document.querySelector("#categoryIcon"),
   categoryColor: document.querySelector("#categoryColor"),
   saveCategoryButton: document.querySelector("#saveCategoryButton"),
+  categoryForm: document.querySelector("#categoryForm"),
   receiptDialog: document.querySelector("#receiptDialog"),
   receiptImage: document.querySelector("#receiptImage"),
   toast: document.querySelector("#toast"),
   loading: document.querySelector("#loading"),
+  dropzonePrompt: document.querySelector(".dropzone-prompt"),
 };
 
-let state = createInitialState();
-let deferredInstallPrompt = null;
+// Global Execution Variables
+let state = null;
 let activeView = "home";
 let analyticsBudgetId = "all";
+let deferredInstallPrompt = null;
+
 let filters = {
   type: "all",
   quick: "all",
@@ -170,13 +109,45 @@ let filters = {
   search: "",
 };
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
+// ── HIGH END ARCHITECTURE: REACTIVE STATE PROXIES ──────────────────
+function makeReactive(targetObject, propagationCallback) {
+  const handler = {
+    get(target, property, receiver) {
+      if (typeof target[property] === "object" && target[property] !== null) {
+        return makeReactive(target[property], propagationCallback);
+      }
+      return Reflect.get(target, property, receiver);
+    },
+    set(target, property, value, receiver) {
+      const isSuccess = Reflect.set(target, property, value, receiver);
+      if (isSuccess) {
+        propagationCallback();
+      }
+      return isSuccess;
+    }
+  };
+  return new Proxy(targetObject, handler);
+}
 
-function uid(prefix) {
-  const id = crypto.randomUUID
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `${prefix}-${id}`;
+// ── TELEMETRY & TACTILE DATA ENGINES ────────────────────────────────
+function triggerTactileFeedback() {
+  if ("vibrate" in navigator) {
+    navigator.vibrate(14); // Precise high-end device micro haptic
+  }
+}
+
+function getCurrencyFormatter() {
+  const currentCode = state?.preferredCurrency || "INR";
+  const configuration = CURRENCY_FORMATS[currentCode] || CURRENCY_FORMATS.INR;
+  return new Intl.NumberFormat(configuration.locale, {
+    style: "currency",
+    currency: configuration.currency,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatCurrencyValue(amount) {
+  return getCurrencyFormatter().format(amount);
 }
 
 function roundMoney(amount) {
@@ -187,8 +158,15 @@ function parseAmount(value) {
   return Number(String(value).replace(/[₹$,€£¥\s]/g, ""));
 }
 
-function formatINR(amount) {
-  return getCurrencyFormatter().format(roundMoney(amount));
+function formatDateTime(value) {
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function computeSum(valuesArray) {
+  return Math.round((valuesArray.reduce((acc, curr) => acc + curr, 0) + Number.EPSILON) * 100) / 100;
 }
 
 function exportAmount(amount) {
@@ -200,8 +178,11 @@ function exportAmount(amount) {
   })}`;
 }
 
-function todayDate() {
-  return new Date().toISOString().slice(0, 10);
+function createUUID(prefix) {
+  const generatedId = crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${prefix}-${generatedId}`;
 }
 
 function nowLocalInput() {
@@ -210,772 +191,149 @@ function nowLocalInput() {
   return d.toISOString().slice(0, 16);
 }
 
-function formatDateTime(value) {
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+function escapeOutputHtml(string) {
+  return String(string).replace(/[&<>"']/g, match => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+  }[match]));
 }
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  }[c]));
-}
-
-function sum(values) {
-  return roundMoney(values.reduce((t, v) => t + v, 0));
-}
-
-function chunk(items, size) {
-  const out = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out.length ? out : [[]];
-}
-
-function showEarlyError(message) {
-  window.setTimeout(() => showToast(message), 0);
-}
-
-// ── State persistence ──────────────────────────────────────────────────────────
-
-async function loadStateAsync() {
-  try {
-    const saved = await getStoredState();
-    if (saved && Array.isArray(saved.budgets) && Array.isArray(saved.transactions)) {
-      state = normalizeState(saved);
-    } else {
-      const legacy = localStorage.getItem(STORAGE_KEY);
-      if (legacy) {
-        try {
-          const parsed = JSON.parse(legacy);
-          state = normalizeState(parsed);
-          await setStoredState(state);
-        } catch {
-          state = createInitialState();
-        }
-      } else {
-        const migrated = migrateLegacyState();
-        state = migrated || createInitialState();
-        await setStoredState(state);
+// ── INDEXEDDB PERSISTENT DRIVER LAYERS ──────────────────────────────
+function accessDB() {
+  return new Promise((resolve, reject) => {
+    const databaseRequest = indexedDB.open(DB_NAME, DB_VERSION);
+    databaseRequest.onupgradeneeded = event => {
+      const instance = event.target.result;
+      if (!instance.objectStoreNames.contains(STORE_NAME)) {
+        instance.createObjectStore(STORE_NAME);
       }
-    }
-  } catch (err) {
-    showEarlyError("Saved data could not be loaded from database.");
-    state = createInitialState();
-  }
-}
-
-function saveState() {
-  setStoredState(state).catch((err) => {
-    showToast("Database storage limit reached. Please backup and clean up files.");
+    };
+    databaseRequest.onsuccess = event => resolve(event.target.result);
+    databaseRequest.onerror = event => reject(event.target.error);
   });
 }
 
-function normalizeState(input) {
-  const budgets = input.budgets.length ? input.budgets : defaultBudgets();
-  const categories =
-    input.categories && input.categories.length ? input.categories : defaultCategories();
-  const activeBudgetId = budgets.some((b) => b.id === input.activeBudgetId)
-    ? input.activeBudgetId
-    : budgets[0].id;
-  const preferredCurrency = input.preferredCurrency || "INR";
-  const themePreference = input.themePreference || "system";
+function retrievePersistedState() {
+  return accessDB().then(db => {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readonly");
+      const store = transaction.objectStore(STORE_NAME);
+      const query = store.get("applicationState");
+      query.onsuccess = () => resolve(query.result);
+      query.onerror = () => reject(query.error);
+    });
+  });
+}
+
+function commitStateToStorage(stateData) {
+  return accessDB().then(db => {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const query = store.put(JSON.parse(JSON.stringify(stateData)), "applicationState");
+      query.onsuccess = () => resolve();
+      query.onerror = () => reject(query.error);
+    });
+  });
+}
+
+// ── BACKWARD-COMPATIBLE MIGRATION PIPELINE ─────────────────────────
+async function executeMigrationSequence() {
+  // 1. Check legacy IndexedDB (v1)
+  try {
+    const legacyDb = await new Promise((resolve) => {
+      const req = indexedDB.open("FinanceManagerDB", 1);
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = () => resolve(null);
+    });
+    if (legacyDb) {
+      if (legacyDb.objectStoreNames.contains("stateStore")) {
+        const legacyData = await new Promise((resolve) => {
+          const tx = legacyDb.transaction("stateStore", "readonly");
+          const store = tx.objectStore("stateStore");
+          const query = store.get("appState");
+          query.onsuccess = () => resolve(query.result);
+          query.onerror = () => resolve(null);
+        });
+        if (legacyData) {
+          await commitStateToStorage(legacyData);
+          legacyDb.close();
+          indexedDB.deleteDatabase("FinanceManagerDB");
+          console.log("IndexedDB (v1) successfully migrated to Pro Edition!");
+          return;
+        }
+      }
+      legacyDb.close();
+    }
+  } catch (e) {
+    console.warn("Legacy DB migration bypassed:", e);
+  }
+
+  // 2. Check legacy localStorage keys
+  try {
+    const legacyLocal = localStorage.getItem("finance-manager-v1") || localStorage.getItem("expense-tracker-state-v1");
+    if (legacyLocal) {
+      const parsed = JSON.parse(legacyLocal);
+      if (parsed && (parsed.transactions || parsed.expenses)) {
+        const normalized = normalizeIncomingState(parsed);
+        await commitStateToStorage(normalized);
+        localStorage.removeItem("finance-manager-v1");
+        console.log("LocalStorage successfully migrated to Pro Edition!");
+      }
+    }
+  } catch (e) {
+    console.warn("Legacy LocalStorage migration bypassed:", e);
+  }
+}
+
+// ── STATE NORMALIZATION PIPE ───────────────────────────────────────
+function normalizeIncomingState(rawInput) {
+  const fallbackBudgets = [
+    { id: "personal", name: "Personal Spending", limit: 0, archived: false },
+    { id: "family", name: "Savings Target", limit: 0, archived: false }
+  ];
+  const fallbackCategories = [
+    { id: "food", name: "Food & Dining", type: "expense", icon: "🍽", color: "#e66a3f" },
+    { id: "shopping", name: "Shopping", type: "expense", icon: "🛍", color: "#8b5cf6" },
+    { id: "bills", name: "Bills & Utilities", type: "expense", icon: "⚡", color: "#f59e0b" },
+    { id: "salary", name: "Salary Income", type: "income", icon: "💼", color: "#10b981" },
+    { id: "others", name: "Others", type: "both", icon: "📦", color: "#6b7280" }
+  ];
+
+  const budgets = Array.isArray(rawInput?.budgets) && rawInput.budgets.length ? rawInput.budgets : fallbackBudgets;
+  const categories = Array.isArray(rawInput?.categories) && rawInput.categories.length ? rawInput.categories : fallbackCategories;
+
   return {
-    activeBudgetId,
-    preferredCurrency,
-    themePreference,
-    budgets: budgets.map((b) => ({
-      id: b.id || uid("budget"),
-      name: b.name || "Budget",
-      limit: roundMoney(Number(b.limit) || 0),
-      archived: Boolean(b.archived),
+    activeBudgetId: budgets[0].id,
+    preferredCurrency: rawInput?.preferredCurrency || "INR",
+    themePreference: rawInput?.themePreference || "system",
+    budgets: budgets.map(b => ({
+      id: b.id || createUUID("b"),
+      name: b.name || "Budget Group",
+      limit: Number(b.limit) || 0,
+      archived: !!b.archived
     })),
-    categories: categories.map((c) => ({
-      id: c.id || uid("category"),
+    categories: categories.map(c => ({
+      id: c.id || createUUID("c"),
       name: c.name || "Category",
       type: c.type || "both",
-      icon: c.icon || "●",
-      color: c.color || "#176b5d",
+      icon: c.icon || "📦",
+      color: c.color || "#059669"
     })),
-    transactions: (input.transactions || []).map(normalizeTransaction).filter(Boolean),
+    transactions: Array.isArray(rawInput?.transactions) ? rawInput.transactions.map(t => ({
+      id: t.id || createUUID("tx"),
+      type: t.type === "income" ? "income" : "expense",
+      amount: Number(t.amount) || 0,
+      description: t.description || "Imported Transaction",
+      dateTime: t.dateTime || nowLocalInput(),
+      categoryId: t.categoryId || "others",
+      budgetId: t.budgetId || budgets[0].id,
+      notes: t.notes || "",
+      receiptData: t.receiptData || ""
+    })) : []
   };
 }
 
-function normalizeTransaction(t) {
-  const amount = Number(t.amount);
-  if (!t.description || !Number.isFinite(amount) || amount <= 0) return null;
-  return {
-    id: t.id || uid("tx"),
-    type: t.type === "income" ? "income" : "expense",
-    amount: roundMoney(amount),
-    description: String(t.description),
-    dateTime: t.dateTime || `${t.purchaseDate || todayDate()}T12:00`,
-    categoryId: t.categoryId || (t.type === "income" ? "salary" : "others"),
-    budgetId: t.budgetId || "personal",
-    notes: t.notes || "",
-    receiptName: t.receiptName || "",
-    receiptData: t.receiptData || "",
-  };
-}
-
-function migrateLegacyState() {
-  const legacy = localStorage.getItem(LEGACY_KEY);
-  if (!legacy) return null;
-  try {
-    const parsed = JSON.parse(legacy);
-    const initial = createInitialState();
-    initial.budgets[0].limit = Number(parsed.budget) || 0;
-    initial.transactions = (parsed.expenses || [])
-      .map((e) => ({
-        id: uid("tx"),
-        type: "expense",
-        amount: roundMoney(Number(e.amount) || 0),
-        description: e.description || "Expense",
-        dateTime: `${e.purchase_date || e.purchaseDate || todayDate()}T12:00`,
-        categoryId: "others",
-        budgetId: "personal",
-        notes: "",
-        receiptName: "",
-        receiptData: "",
-      }))
-      .filter((t) => t.amount > 0);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    return initial;
-  } catch {
-    return null;
-  }
-}
-
-function createInitialState() {
-  return {
-    activeBudgetId: "personal",
-    preferredCurrency: "INR",
-    themePreference: "system",
-    budgets: defaultBudgets(),
-    categories: defaultCategories(),
-    transactions: [],
-  };
-}
-
-function defaultBudgets() {
-  return DEFAULT_BUDGETS.map(([id, name, limit]) => ({ id, name, limit, archived: false }));
-}
-
-function defaultCategories() {
-  return DEFAULT_CATEGORIES.map(([id, name, type, icon, color]) => ({
-    id, name, type, icon, color,
-  }));
-}
-
-// ── Lookups ────────────────────────────────────────────────────────────────────
-
-function getBudget(id) {
-  return (
-    state.budgets.find((b) => b.id === id) || state.budgets[0]
-  );
-}
-
-function getCategory(id) {
-  return (
-    state.categories.find((c) => c.id === id) ||
-    state.categories.find((c) => c.id === "others") ||
-    state.categories[0]
-  );
-}
-
-function activeBudget() {
-  return getBudget(state.activeBudgetId);
-}
-
-// ── Calculations ───────────────────────────────────────────────────────────────
-
-function calculateBudgetTotals(budgetId) {
-  const txs = state.transactions.filter((t) => t.budgetId === budgetId);
-  const income = sum(txs.filter((t) => t.type === "income").map((t) => t.amount));
-  const expenses = sum(txs.filter((t) => t.type === "expense").map((t) => t.amount));
-  const budget = getBudget(budgetId);
-  return {
-    income,
-    expenses,
-    balance: roundMoney(budget.limit + income - expenses),
-    limit: budget.limit,
-  };
-}
-
-function calculateGlobalTotals(transactions = state.transactions) {
-  const income = sum(transactions.filter((t) => t.type === "income").map((t) => t.amount));
-  const expenses = sum(transactions.filter((t) => t.type === "expense").map((t) => t.amount));
-  const limits = sum(state.budgets.filter((b) => !b.archived).map((b) => b.limit));
-  return {
-    income,
-    expenses,
-    balance: roundMoney(limits + income - expenses),
-  };
-}
-
-// ── Data mutations ─────────────────────────────────────────────────────────────
-
-function sortTransactions() {
-  state.transactions.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
-}
-
-function validateTransaction(t) {
-  if (!t.description.trim()) throw new Error("Enter a transaction description.");
-  if (!Number.isFinite(t.amount) || t.amount <= 0) throw new Error("Enter a valid amount.");
-  if (!t.dateTime) throw new Error("Choose date and time.");
-  if (!t.categoryId) throw new Error("Choose a category.");
-  if (!t.budgetId) throw new Error("Choose a budget.");
-}
-
-function addOrUpdateTransaction(payload) {
-  validateTransaction(payload);
-  if (payload.id) {
-    const index = state.transactions.findIndex((t) => t.id === payload.id);
-    if (index === -1) throw new Error("Transaction not found.");
-    state.transactions[index] = {
-      ...state.transactions[index],
-      ...payload,
-      amount: roundMoney(payload.amount),
-    };
-  } else {
-    state.transactions.push({ ...payload, id: uid("tx"), amount: roundMoney(payload.amount) });
-  }
-  sortTransactions();
-  saveState();
-}
-
-function deleteTransaction(id) {
-  const t = state.transactions.find((item) => item.id === id);
-  if (!t) return;
-  if (!confirm(`Delete this transaction?\n\n${t.description} — ${formatINR(t.amount)}`)) return;
-  state.transactions = state.transactions.filter((item) => item.id !== id);
-  saveState();
-  render();
-  showToast("Transaction deleted");
-}
-
-function viewReceipt(id) {
-  const t = state.transactions.find((item) => item.id === id);
-  if (!t?.receiptData) {
-    showToast("No receipt saved for this transaction");
-    return;
-  }
-
-  elements.receiptImage.src = t.receiptData;
-  elements.receiptDialog.showModal();
-}
-
-function addOrUpdateBudget(payload) {
-  if (!payload.name.trim()) throw new Error("Enter a budget name.");
-  if (!Number.isFinite(payload.limit) || payload.limit < 0)
-    throw new Error("Enter a valid budget amount.");
-  if (payload.id) {
-    const budget = getBudget(payload.id);
-    budget.name = payload.name.trim();
-    budget.limit = roundMoney(payload.limit);
-  } else {
-    const budget = {
-      id: uid("budget"),
-      name: payload.name.trim(),
-      limit: roundMoney(payload.limit),
-      archived: false,
-    };
-    state.budgets.push(budget);
-    state.activeBudgetId = budget.id;
-  }
-  saveState();
-}
-
-function deleteBudget(id) {
-  if (state.budgets.length <= 1) {
-    showToast("At least one budget is required");
-    return;
-  }
-  const budget = getBudget(id);
-  if (
-    !confirm(`Delete "${budget.name}" and all its transactions? This cannot be undone.`)
-  )
-    return;
-  state.budgets = state.budgets.filter((b) => b.id !== id);
-  state.transactions = state.transactions.filter((t) => t.budgetId !== id);
-  if (state.activeBudgetId === id) state.activeBudgetId = state.budgets[0].id;
-  saveState();
-  render();
-  showToast("Budget deleted");
-}
-
-function resetActiveBudget() {
-  const budget = activeBudget();
-  if (
-    !confirm(
-      `Reset "${budget.name}"?\n\nThis will clear all transactions for this budget. This cannot be undone.`
-    )
-  )
-    return;
-  state.transactions = state.transactions.filter((t) => t.budgetId !== budget.id);
-  saveState();
-  render();
-  showToast("Budget transactions cleared");
-}
-
-function addOrUpdateCategory(payload) {
-  if (!payload.name.trim()) throw new Error("Enter a category name.");
-  if (payload.id) {
-    const cat = getCategory(payload.id);
-    cat.name = payload.name.trim();
-    cat.type = payload.type;
-    cat.icon = payload.icon.trim() || "●";
-    cat.color = payload.color;
-  } else {
-    state.categories.push({
-      id: uid("category"),
-      name: payload.name.trim(),
-      type: payload.type,
-      icon: payload.icon.trim() || "●",
-      color: payload.color,
-    });
-  }
-  saveState();
-}
-
-function deleteCategory(id) {
-  if (state.categories.length <= 1) {
-    showToast("At least one category is required");
-    return;
-  }
-  const cat = getCategory(id);
-  if (!confirm(`Delete category "${cat.name}"? Transactions will move to Others.`)) return;
-  const fallback =
-    state.categories.find((c) => c.id === "others") ||
-    state.categories.find((c) => c.id !== id);
-  state.transactions.forEach((t) => {
-    if (t.categoryId === id) t.categoryId = fallback.id;
-  });
-  state.categories = state.categories.filter((c) => c.id !== id);
-  saveState();
-  render();
-  showToast("Category deleted");
-}
-
-// ── Filtering ──────────────────────────────────────────────────────────────────
-
-function getFilteredTransactions() {
-  let out = [...state.transactions];
-  if (filters.type !== "all") out = out.filter((t) => t.type === filters.type);
-  if (filters.categoryId !== "all") out = out.filter((t) => t.categoryId === filters.categoryId);
-  if (filters.budgetIds.length) out = out.filter((t) => filters.budgetIds.includes(t.budgetId));
-  if (filters.search.trim()) {
-    const q = filters.search.trim().toLowerCase();
-    out = out.filter((t) => {
-      const cat = getCategory(t.categoryId);
-      return [
-        t.description,
-        cat.name,
-        getBudget(t.budgetId).name,
-        String(t.amount),
-        t.notes,
-      ].some((v) => String(v).toLowerCase().includes(q));
-    });
-  }
-  const now = new Date();
-  if (filters.quick !== "all") {
-    let start;
-    if (filters.quick === "year") {
-      start = new Date(now.getFullYear(), 0, 1);
-    } else {
-      start = new Date(now);
-      start.setDate(start.getDate() - Number(filters.quick));
-    }
-    out = out.filter((t) => new Date(t.dateTime) >= start);
-  }
-  if (filters.from) out = out.filter((t) => new Date(t.dateTime) >= new Date(filters.from));
-  if (filters.to) out = out.filter((t) => new Date(t.dateTime) <= new Date(filters.to));
-  return out.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
-}
-
-// ── Render ─────────────────────────────────────────────────────────────────────
-
-function render() {
-  renderSelectors();
-  renderHome();
-  renderTransactions();
-  renderAnalytics();
-  renderBudgets();
-  renderCategories();
-  updateStorageUsageEstimate();
-}
-
-function renderSelectors() {
-  const budgetOptions = state.budgets
-    .map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`)
-    .join("");
-
-  elements.activeBudgetSelect.innerHTML = budgetOptions;
-  elements.activeBudgetSelect.value = state.activeBudgetId;
-
-  elements.transactionBudget.innerHTML = budgetOptions;
-  elements.transactionBudget.value = state.activeBudgetId;
-
-  elements.budgetFilter.innerHTML =
-    `<option value="all">All Budgets</option>` +
-    state.budgets.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
-  elements.budgetFilter.value = filters.budgetIds[0] || "all";
-
-  elements.analyticsBudgetSelect.innerHTML = `<option value="all">All Budgets</option>${budgetOptions}`;
-  elements.analyticsBudgetSelect.value = analyticsBudgetId;
-
-  elements.categoryFilter.innerHTML =
-    `<option value="all">All Categories</option>` +
-    state.categories
-      .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
-      .join("");
-  elements.categoryFilter.value = filters.categoryId;
-
-  if (elements.themeSelect) elements.themeSelect.value = state.themePreference || "system";
-  if (elements.currencySelect) elements.currencySelect.value = state.preferredCurrency || "INR";
-
-  renderTransactionCategoryOptions(elements.transactionType.value || "expense");
-}
-
-function renderTransactionCategoryOptions(type) {
-  elements.transactionCategory.innerHTML = state.categories
-    .filter((c) => c.type === "both" || c.type === type)
-    .map((c) => `<option value="${c.id}">${c.icon} ${escapeHtml(c.name)}</option>`)
-    .join("");
-}
-
-function renderHome() {
-  const totals = calculateGlobalTotals();
-  elements.currentBalance.textContent = formatINR(totals.balance);
-  elements.totalIncome.textContent = formatINR(totals.income);
-  elements.totalExpenses.textContent = formatINR(totals.expenses);
-
-  const selectedBudget = getBudget(state.activeBudgetId);
-  elements.budgetOverview.innerHTML = selectedBudget
-    ? budgetCardHtml(selectedBudget, true)
-    : emptyState("No active budget selected.");
-}
-
-function renderTransactions() {
-  const txs = getFilteredTransactions();
-  elements.filteredCount.textContent = `${txs.length} transaction${txs.length === 1 ? "" : "s"}`;
-  elements.transactionList.innerHTML = txs.length
-    ? txs.map(transactionHtml).join("")
-    : emptyState("No transactions match these filters.");
-}
-
-function renderAnalytics() {
-  const txs =
-    analyticsBudgetId === "all"
-      ? state.transactions
-      : state.transactions.filter((t) => t.budgetId === analyticsBudgetId);
-  const income = sum(txs.filter((t) => t.type === "income").map((t) => t.amount));
-  const expense = sum(txs.filter((t) => t.type === "expense").map((t) => t.amount));
-  elements.analyticsIncome.textContent = formatINR(income);
-  elements.analyticsExpense.textContent = formatINR(expense);
-  elements.analyticsNet.textContent = formatINR(income - expense);
-  elements.analyticsNet.className = income - expense >= 0 ? "income-text" : "expense-text";
-  renderExpenseChart(txs);
-  renderMonthlyBars(txs);
-}
-
-function renderBudgets() {
-  elements.budgetCards.innerHTML = state.budgets.map((b) => budgetCardHtml(b, false)).join("");
-}
-
-function renderCategories() {
-  elements.categoryCards.innerHTML = state.categories
-    .map(
-      (c) => `
-    <article class="category-card">
-      <header>
-        <span class="category-icon" style="background:${c.color}">${c.icon}</span>
-        <div>
-          <h3>${escapeHtml(c.name)}</h3>
-          <p class="muted">${c.type}</p>
-        </div>
-      </header>
-      <footer>
-        <button class="edit-button" type="button" data-edit-category="${c.id}">Edit</button>
-        <button class="delete-button" type="button" data-delete-category="${c.id}">Delete</button>
-      </footer>
-    </article>`
-    )
-    .join("");
-}
-
-function budgetCardHtml(budget, compact) {
-  const totals = calculateBudgetTotals(budget.id);
-  const spentPercent =
-    budget.limit > 0 ? Math.min(100, (totals.expenses / budget.limit) * 100) : 0;
-  const activeClass = budget.id === state.activeBudgetId ? " active" : "";
-  const overBudget = budget.limit > 0 && totals.expenses > budget.limit;
-  return `
-    <article class="budget-card${activeClass}" data-select-budget="${budget.id}" tabindex="0" role="button" aria-label="Switch to ${escapeHtml(budget.name)}">
-      <header>
-        <div>
-          <h3>${escapeHtml(budget.name)}</h3>
-          <p class="muted">Balance ${formatINR(totals.balance)}</p>
-        </div>
-        <span class="badge">${formatINR(budget.limit)}</span>
-      </header>
-      <div class="progress">
-        <span style="width:${spentPercent}%;background:${overBudget ? "var(--expense)" : "var(--primary)"}"></span>
-      </div>
-      <p class="muted">Spent ${formatINR(totals.expenses)} · Income ${formatINR(totals.income)}</p>
-      ${
-        compact
-          ? ""
-          : `<footer>
-          <button class="edit-button" type="button" data-edit-budget="${budget.id}">Edit</button>
-          <button class="delete-button" type="button" data-delete-budget="${budget.id}">Delete</button>
-        </footer>`
-      }
-    </article>`;
-}
-
-function transactionHtml(t) {
-  const cat = getCategory(t.categoryId);
-  const budget = getBudget(t.budgetId);
-  const sign = t.type === "income" ? "+" : "−";
-  const amountClass = t.type === "income" ? "income-text" : "expense-text";
-  const receipt = t.receiptName ? `<span class="badge">📎 Receipt</span>` : "";
-  return `
-    <article class="transaction-card">
-      <span class="category-icon" style="background:${cat.color}">${cat.icon}</span>
-      <div class="transaction-main">
-        <h3>${escapeHtml(t.description)}</h3>
-        <div class="transaction-meta">
-          <span class="badge">${escapeHtml(cat.name)}</span>
-          <span class="badge">${escapeHtml(budget.name)}</span>
-          ${receipt}
-        </div>
-        <p class="muted">${formatDateTime(t.dateTime)}${t.notes ? ` · ${escapeHtml(t.notes)}` : ""}</p>
-        <div class="transaction-actions">
-          ${t.receiptData ? `<button class="edit-button" type="button" data-view-receipt="${t.id}">View Receipt</button>` : ""}
-          <button class="edit-button" type="button" data-edit-transaction="${t.id}">Edit</button>
-          <button class="delete-button" type="button" data-delete-transaction="${t.id}">Delete</button>
-        </div>
-      </div>
-      <strong class="amount ${amountClass}">${sign}${formatINR(t.amount)}</strong>
-    </article>`;
-}
-
-function emptyState(text) {
-  return `<p class="muted" style="padding:16px 0;text-align:center">${escapeHtml(text)}</p>`;
-}
-
-// ── Charts ─────────────────────────────────────────────────────────────────────
-
-function renderExpenseChart(transactions) {
-  const canvas = elements.expenseChart;
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width;
-  const H = canvas.height;
-  const CX = W / 2;
-  const CY = H / 2;
-  const RADIUS = W * 0.3;
-  const LINE_W = W * 0.2;
-
-  ctx.clearRect(0, 0, W, H);
-
-  const expenses = transactions.filter((t) => t.type === "expense");
-  const categoryTotals = state.categories
-    .map((c) => ({
-      ...c,
-      total: sum(
-        expenses.filter((t) => t.categoryId === c.id).map((t) => t.amount)
-      ),
-    }))
-    .filter((c) => c.total > 0);
-
-  const total = sum(categoryTotals.map((c) => c.total));
-
-  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-
-  if (!total) {
-    // Draw empty ring
-    ctx.lineWidth = LINE_W;
-    ctx.strokeStyle = isDark ? "#293d3a" : "#dfeae7";
-    ctx.beginPath();
-    ctx.arc(CX, CY, RADIUS, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = isDark ? "#8fa39f" : "#62716e";
-    ctx.font = `bold ${W * 0.05}px Inter, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("No data", CX, CY);
-
-    elements.categoryBreakdown.innerHTML = emptyState(
-      "Add expenses to see category analytics."
-    );
-    return;
-  }
-
-  // Draw donut segments
-  ctx.lineWidth = LINE_W;
-  ctx.lineCap = "butt";
-  let start = -Math.PI / 2;
-  const GAP = total > 0 ? 0.015 : 0; // tiny gap between segments
-
-  categoryTotals.forEach((c) => {
-    const angle = (c.total / total) * Math.PI * 2 - GAP;
-    ctx.strokeStyle = c.color;
-    ctx.beginPath();
-    ctx.arc(CX, CY, RADIUS, start, start + angle);
-    ctx.stroke();
-    c.start = start;
-    c.end = start + angle;
-    start += angle + GAP;
-  });
-
-  // Centre text
-  ctx.fillStyle = isDark ? "#e5edea" : "#14211f";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `700 ${W * 0.05}px Inter, sans-serif`;
-  ctx.fillText("Expenses", CX, CY - W * 0.04);
-  ctx.font = `800 ${W * 0.065}px Inter, sans-serif`;
-  ctx.fillText(formatINR(total), CX, CY + W * 0.045);
-
-  // Category breakdown list
-  elements.categoryBreakdown.innerHTML = categoryTotals
-    .map((c) => {
-      const pct = total ? (c.total / total) * 100 : 0;
-      return `
-      <div class="breakdown-row">
-        <div class="breakdown-line">
-          <span><span class="badge" style="background:${c.color};color:#fff">${c.icon}</span> ${escapeHtml(c.name)}</span>
-          <strong>${pct.toFixed(1)}%</strong>
-        </div>
-        <div class="bar-track"><span style="width:${pct}%;background:${c.color}"></span></div>
-        <p class="muted">${formatINR(c.total)}</p>
-      </div>`;
-    })
-    .join("");
-
-  // Tap interaction on chart
-  canvas.onclick = (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = W / rect.width;
-    const scaleY = H / rect.height;
-    const x = (e.clientX - rect.left) * scaleX - CX;
-    const y = (e.clientY - rect.top) * scaleY - CY;
-    const dist = Math.sqrt(x * x + y * y);
-    if (dist < RADIUS - LINE_W / 2 || dist > RADIUS + LINE_W / 2) return;
-    let angle = Math.atan2(y, x);
-    if (angle < -Math.PI / 2) angle += Math.PI * 2;
-    const hit = categoryTotals.find((c) => angle >= c.start && angle <= c.end);
-    if (hit) elements.chartHint.textContent = `${hit.name}: ${formatINR(hit.total)}`;
-  };
-}
-
-function renderMonthlyBars(transactions) {
-  const months = new Map();
-  transactions.forEach((t) => {
-    const d = new Date(t.dateTime);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    if (!months.has(key)) months.set(key, { income: 0, expense: 0 });
-    months.get(key)[t.type] += t.amount;
-  });
-  const rows = [...months.entries()]
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .slice(0, 6);
-  const max = Math.max(1, ...rows.map(([, v]) => Math.max(v.income, v.expense)));
-  elements.monthlyBars.innerHTML = rows.length
-    ? rows
-        .map(
-          ([month, v]) => `
-      <div class="bar-row">
-        <div class="bar-line">
-          <strong>${month}</strong>
-          <span class="muted">Income ${formatINR(v.income)} · Expense ${formatINR(v.expense)}</span>
-        </div>
-        <div class="bar-track"><span style="width:${(v.expense / max) * 100}%;background:var(--expense)"></span></div>
-        <div class="bar-track"><span style="width:${(v.income / max) * 100}%;background:var(--income)"></span></div>
-      </div>`
-        )
-        .join("")
-    : emptyState("No monthly data yet.");
-}
-
-// ── Navigation ─────────────────────────────────────────────────────────────────
-
-function setView(view) {
-  activeView = view;
-  elements.views.forEach((el) =>
-    el.classList.toggle("active", el.dataset.view === view)
-  );
-  document.querySelectorAll(".bottom-nav [data-nav]").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.nav === view);
-  });
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-// ── Dialogs ────────────────────────────────────────────────────────────────────
-
-function openTransactionDialog(type = "expense", id = "") {
-  const t = id ? state.transactions.find((item) => item.id === id) : null;
-  const txType = t?.type || type;
-  elements.transactionDialogTitle.textContent = t
-    ? "Edit Transaction"
-    : txType === "income"
-    ? "Add Income"
-    : "Add Expense";
-  elements.transactionId.value = t?.id || "";
-  elements.transactionType.value = txType;
-  elements.transactionAmount.value = t?.amount || "";
-  elements.transactionDescription.value = t?.description || "";
-  elements.transactionDateTime.value = t?.dateTime || nowLocalInput();
-  elements.transactionBudget.value = t?.budgetId || state.activeBudgetId;
-  renderTransactionCategoryOptions(txType);
-  elements.transactionCategory.value =
-    t?.categoryId || elements.transactionCategory.options[0]?.value || "";
-  elements.transactionNotes.value = t?.notes || "";
-  elements.transactionReceipt.value = "";
-  elements.transactionDialog.showModal();
-}
-
-async function saveTransactionFromForm() {
-  try {
-    setLoading(true);
-    const existing = elements.transactionId.value
-      ? state.transactions.find((t) => t.id === elements.transactionId.value)
-      : null;
-    const receiptFile = elements.transactionReceipt.files[0];
-    const receipt = receiptFile
-      ? await readReceipt(receiptFile)
-      : {
-          receiptName: existing?.receiptName || "",
-          receiptData: existing?.receiptData || "",
-        };
-    addOrUpdateTransaction({
-      id: elements.transactionId.value,
-      type: elements.transactionType.value,
-      amount: parseAmount(elements.transactionAmount.value),
-      description: elements.transactionDescription.value.trim(),
-      dateTime: elements.transactionDateTime.value,
-      budgetId: elements.transactionBudget.value,
-      categoryId: elements.transactionCategory.value,
-      notes: elements.transactionNotes.value.trim(),
-      ...receipt,
-    });
-    elements.transactionDialog.close();
-    render();
-    showToast("Transaction saved");
-  } catch (error) {
-    showToast(error.message);
-  } finally {
-    setLoading(false);
-  }
-}
-
+// ── CLIENT-SIDE RECEIPT PHOTO COMPRESSION ─────────────────────────
 function readReceipt(file) {
   if (file.type && !file.type.startsWith("image/")) {
     return Promise.reject(new Error("File is not an image."));
@@ -1011,8 +369,418 @@ function readReceipt(file) {
   });
 }
 
-function openBudgetDialog(id = "") {
-  const budget = id ? getBudget(id) : null;
+// ── DATA TRANSFORMATIONS & FINANCIAL PIPES ────────────────────────────
+function aggregateBudgetData(budgetId) {
+  const filteredLogs = state.transactions.filter(t => t.budgetId === budgetId);
+  const incomeTotal = computeSum(filteredLogs.filter(t => t.type === "income").map(t => t.amount));
+  const expenseTotal = computeSum(filteredLogs.filter(t => t.type === "expense").map(t => t.amount));
+  const structuralLimit = state.budgets.find(b => b.id === budgetId)?.limit || 0;
+  return {
+    income: incomeTotal,
+    expenses: expenseTotal,
+    balance: Math.round((structuralLimit + incomeTotal - expenseTotal) * 100) / 100,
+    limit: structuralLimit
+  };
+}
+
+function aggregateGlobalFinancials() {
+  const targetedLogs = state.transactions;
+  const totalIncome = computeSum(targetedLogs.filter(t => t.type === "income").map(t => t.amount));
+  const totalExpenses = computeSum(targetedLogs.filter(t => t.type === "expense").map(t => t.amount));
+  const aggregatedLimits = computeSum(state.budgets.filter(b => !b.archived).map(b => b.limit));
+  return {
+    income: totalIncome,
+    expenses: totalExpenses,
+    balance: Math.round((aggregatedLimits + totalIncome - totalExpenses) * 100) / 100
+  };
+}
+
+function getFilteredTransactions() {
+  let initialPool = [...state.transactions];
+  if (filters.type !== "all") initialPool = initialPool.filter(t => t.type === filters.type);
+  if (filters.categoryId !== "all") initialPool = initialPool.filter(t => t.categoryId === filters.categoryId);
+  if (filters.budgetIds.length) initialPool = initialPool.filter(t => filters.budgetIds.includes(t.budgetId));
+  
+  const now = new Date();
+  if (filters.quick !== "all") {
+    let start;
+    if (filters.quick === "year") {
+      start = new Date(now.getFullYear(), 0, 1);
+    } else {
+      start = new Date(now);
+      start.setDate(start.getDate() - Number(filters.quick));
+    }
+    initialPool = initialPool.filter((t) => new Date(t.dateTime) >= start);
+  }
+  if (filters.from) initialPool = initialPool.filter((t) => new Date(t.dateTime) >= new Date(filters.from));
+  if (filters.to) initialPool = initialPool.filter((t) => new Date(t.dateTime) <= new Date(filters.to));
+
+  if (filters.search.trim()) {
+    const matchQuery = filters.search.trim().toLowerCase();
+    initialPool = initialPool.filter(t => {
+      const cat = state.categories.find(c => c.id === t.categoryId) || {};
+      const bud = state.budgets.find(b => b.id === t.budgetId) || {};
+      return t.description.toLowerCase().includes(matchQuery) || 
+             t.notes.toLowerCase().includes(matchQuery) ||
+             cat.name.toLowerCase().includes(matchQuery) ||
+             (bud.name && bud.name.toLowerCase().includes(matchQuery)) ||
+             String(t.amount).includes(matchQuery);
+    });
+  }
+  return initialPool.sort((alpha, beta) => new Date(beta.dateTime) - new Date(alpha.dateTime));
+}
+
+// ── ATOMIC HIGH PERFORMANCE ATOMIC DOM DRAWING WORKSPACES ──────────────
+function executeRenderSequence() {
+  renderFormSelectors();
+  renderDashboardViewport();
+  renderLedgerTimelineViewport();
+  renderAnalyticsDistributionEngine();
+  renderMonthlyBarChart();
+  renderBudgetsViewport();
+  renderControlSettingsTaxonomy();
+  updateStorageTelemetryMetrics();
+}
+
+function renderFormSelectors() {
+  const configurationsOptionsHTML = state.budgets.map(b => `<option value="${b.id}">${escapeOutputHtml(b.name)}</option>`).join("");
+  
+  elements.activeBudgetSelect.innerHTML = configurationsOptionsHTML;
+  elements.activeBudgetSelect.value = state.activeBudgetId;
+  
+  elements.transactionBudget.innerHTML = configurationsOptionsHTML;
+  elements.transactionBudget.value = state.activeBudgetId;
+
+  elements.budgetFilter.innerHTML = `<option value="all">All Budgets</option>` + state.budgets.map(b => `<option value="${b.id}">${escapeOutputHtml(b.name)}</option>`).join("");
+  elements.budgetFilter.value = filters.budgetIds[0] || "all";
+  
+  elements.analyticsBudgetSelect.innerHTML = `<option value="all">All Budgets</option>` + configurationsOptionsHTML;
+  elements.analyticsBudgetSelect.value = analyticsBudgetId;
+
+  renderTransactionCategoryOptions(elements.transactionType.value || "expense");
+  elements.categoryFilter.innerHTML = `<option value="all">All Categories</option>` + state.categories.map(c => `<option value="${c.id}">${c.icon} ${escapeOutputHtml(c.name)}</option>`).join("");
+  elements.categoryFilter.value = filters.categoryId;
+
+  if (elements.themeSelect) elements.themeSelect.value = state.themePreference;
+  if (elements.currencySelect) elements.currencySelect.value = state.preferredCurrency;
+}
+
+function renderTransactionCategoryOptions(type) {
+  elements.transactionCategory.innerHTML = state.categories
+    .filter(c => c.type === "both" || c.type === type)
+    .map(c => `<option value="${c.id}">${c.icon} ${escapeOutputHtml(c.name)}</option>`)
+    .join("");
+}
+
+function renderDashboardViewport() {
+  const dynamicGlobalMetrics = aggregateGlobalFinancials();
+  elements.currentBalance.textContent = formatCurrencyValue(dynamicGlobalMetrics.balance);
+  elements.totalIncome.textContent = formatCurrencyValue(dynamicGlobalMetrics.income);
+  elements.totalExpenses.textContent = formatCurrencyValue(dynamicGlobalMetrics.expenses);
+
+  // Show only the selected budget
+  const targetedBudget = state.budgets.find(b => b.id === state.activeBudgetId);
+  if (targetedBudget) {
+    const allocationData = aggregateBudgetData(targetedBudget.id);
+    const calculatedPercentage = parseFloat(allocationData.limit) > 0 ? Math.min(100, (allocationData.expenses / allocationData.limit) * 100) : 0;
+    
+    elements.budgetOverview.innerHTML = `
+      <div class="budget-card-premium animate-slide-up">
+        <div class="budget-card-meta">
+          <h3>${escapeOutputHtml(targetedBudget.name)}</h3>
+          <strong class="amount">${formatCurrencyValue(allocationData.balance)} left</strong>
+        </div>
+        <div class="bar-track">
+          <span style="width: ${calculatedPercentage}%; background-color: ${calculatedPercentage > 90 ? 'var(--expense)' : 'var(--primary)'}"></span>
+        </div>
+        <div class="budget-card-footer-telemetry">
+          <span>Limit: ${formatCurrencyValue(allocationData.limit)}</span>
+          <span>Spent: ${formatCurrencyValue(allocationData.expenses)}</span>
+        </div>
+      </div>
+    `;
+  } else {
+    elements.budgetOverview.innerHTML = `<p class="muted" style="text-align:center;">No active budget selected.</p>`;
+  }
+}
+
+function renderLedgerTimelineViewport() {
+  const transactionDataset = getFilteredTransactions();
+  elements.filteredCount.textContent = `${transactionDataset.length} transactions`;
+  
+  const documentMemoryFragment = document.createDocumentFragment();
+  elements.transactionList.innerHTML = "";
+
+  if (transactionDataset.length === 0) {
+    elements.transactionList.innerHTML = `<p class="muted" style="padding:24px 0; text-align:center;">No transactions match your filters.</p>`;
+    return;
+  }
+
+  transactionDataset.forEach(tx => {
+    const containerAllocationNode = document.createElement("div");
+    const targetCategoryNode = state.categories.find(c => c.id === tx.categoryId) || { icon: "📦", name: "General", color: "#6b7280" };
+    const signOperator = tx.type === "income" ? "+" : "−";
+    const localizedClassStream = tx.type === "income" ? "income-text" : "expense-text";
+    
+    const receiptBadge = tx.receiptData ? `<span class="badge" style="cursor:pointer; background-color:var(--primary-soft); color:var(--primary);" data-view-receipt="${tx.id}">📎 Proof Attached</span>` : "";
+
+    containerAllocationNode.className = "transaction-card";
+    containerAllocationNode.innerHTML = `
+      <div class="category-icon" style="background-color: ${targetCategoryNode.color}">${targetCategoryNode.icon}</div>
+      <div class="transaction-main">
+        <h3>${escapeOutputHtml(tx.description)}</h3>
+        <div class="transaction-meta">
+          <span class="badge">${escapeOutputHtml(targetCategoryNode.name)}</span>
+          ${receiptBadge}
+        </div>
+        <p class="caption-muted" style="margin-top:4px;">${formatDateTime(tx.dateTime)}${tx.notes ? ` · ${escapeOutputHtml(tx.notes)}` : ""}</p>
+      </div>
+      <div class="transaction-end-alignment" style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+        <strong class="amount ${localizedClassStream}">${signOperator}${formatCurrencyValue(tx.amount)}</strong>
+        <div class="transaction-actions">
+          <button type="button" class="btn-secondary-sm edit-trigger" data-id="${tx.id}">Edit</button>
+          <button type="button" class="btn-secondary-sm btn-text-danger delete-trigger" data-id="${tx.id}">Delete</button>
+        </div>
+      </div>
+    `;
+
+    containerAllocationNode.querySelector(".edit-trigger").addEventListener("click", () => triggerModificationModal(tx.id));
+    containerAllocationNode.querySelector(".delete-trigger").addEventListener("click", () => executeLogPurgeSequence(tx.id));
+    
+    if (tx.receiptData) {
+      containerAllocationNode.querySelector(`[data-view-receipt="${tx.id}"]`).addEventListener("click", (e) => {
+        e.stopPropagation();
+        triggerTactileFeedback();
+        elements.receiptImage.src = tx.receiptData;
+        elements.receiptDialog.showModal();
+      });
+    }
+
+    documentMemoryFragment.appendChild(containerAllocationNode);
+  });
+
+  elements.transactionList.appendChild(documentMemoryFragment);
+}
+
+function renderAnalyticsDistributionEngine() {
+  const activeCanvas = elements.expenseChart;
+  if (!activeCanvas) return;
+  
+  const ctx = activeCanvas.getContext("2d");
+  const dimensionsWidth = activeCanvas.width;
+  const dimensionsHeight = activeCanvas.height;
+  const centerAxisX = dimensionsWidth / 2;
+  const centerAxisY = dimensionsHeight / 2;
+  const dynamicRadius = dimensionsWidth * 0.35;
+  const LINE_W = 28;
+
+  ctx.clearRect(0, 0, dimensionsWidth, dimensionsHeight);
+
+  const targetedTxs = analyticsBudgetId === "all"
+    ? state.transactions
+    : state.transactions.filter(t => t.budgetId === analyticsBudgetId);
+
+  const targetedExpenses = targetedTxs.filter(t => t.type === "expense");
+  const computingMetricsMatrix = state.categories.map(cat => ({
+    ...cat,
+    volume: computeSum(targetedExpenses.filter(t => t.categoryId === cat.id).map(t => t.amount))
+  })).filter(c => c.volume > 0);
+
+  const totalExpenseVolume = computeSum(computingMetricsMatrix.map(c => c.volume));
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+
+  // Center metrics aggregation cards
+  const incomeTotal = computeSum(targetedTxs.filter(t => t.type === "income").map(t => t.amount));
+  elements.analyticsIncome.textContent = formatCurrencyValue(incomeTotal);
+  elements.analyticsExpense.textContent = formatCurrencyValue(totalExpenseVolume);
+  elements.analyticsNet.textContent = formatCurrencyValue(incomeTotal - totalExpenseVolume);
+  elements.analyticsNet.className = (incomeTotal - totalExpenseVolume >= 0) ? "income-text" : "expense-text";
+
+  if (totalExpenseVolume === 0) {
+    ctx.lineWidth = LINE_W;
+    ctx.strokeStyle = isDark ? "#1e2e2b" : "#e2e8f0";
+    ctx.beginPath();
+    ctx.arc(centerAxisX, centerAxisY, dynamicRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = isDark ? "#9ca3af" : "#64748b";
+    ctx.font = "700 1rem var(--font-sans)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("No Expenses Yet", centerAxisX, centerAxisY);
+
+    elements.categoryBreakdown.innerHTML = `<p class="muted" style="text-align:center; padding:12px 0;">Add expenses to see category breakdown.</p>`;
+    return;
+  }
+
+  // Draw segments
+  let processingRadialStartAngle = -Math.PI / 2;
+  const GAP = computingMetricsMatrix.length > 1 ? 0.015 : 0;
+  
+  computingMetricsMatrix.forEach(slice => {
+    const computedSliceAngle = (slice.volume / totalExpenseVolume) * Math.PI * 2;
+    ctx.lineWidth = LINE_W;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = slice.color;
+    
+    ctx.beginPath();
+    ctx.arc(centerAxisX, centerAxisY, dynamicRadius, processingRadialStartAngle, processingRadialStartAngle + computedSliceAngle - GAP);
+    ctx.stroke();
+    
+    slice.start = processingRadialStartAngle;
+    slice.end = processingRadialStartAngle + computedSliceAngle - GAP;
+    processingRadialStartAngle += computedSliceAngle;
+  });
+
+  // Inject High Fidelity Core Vector Labels Internally
+  ctx.fillStyle = isDark ? "#f9fafb" : "#0f172a";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "800 1.1rem var(--font-sans)";
+  ctx.fillText(formatCurrencyValue(totalExpenseVolume), centerAxisX, centerAxisY);
+
+  // Category Matrix Segment rows
+  elements.categoryBreakdown.innerHTML = computingMetricsMatrix.map(c => {
+    const percent = (c.volume / totalExpenseVolume) * 100;
+    return `
+      <div class="breakdown-row">
+        <div class="breakdown-line" style="display:flex; justify-content:space-between; font-size:0.88rem;">
+          <span><span class="badge" style="background-color:${c.color}; color:#fff; border:none; padding:2px 6px;">${c.icon}</span> ${escapeOutputHtml(c.name)}</span>
+          <strong>${percent.toFixed(1)}% (${formatCurrencyValue(c.volume)})</strong>
+        </div>
+        <div class="bar-track"><span style="width: ${percent}%; background-color: ${c.color}"></span></div>
+      </div>
+    `;
+  }).join("");
+
+  // Segment tap interaction
+  activeCanvas.onclick = (e) => {
+    const rect = activeCanvas.getBoundingClientRect();
+    const scaleX = dimensionsWidth / rect.width;
+    const scaleY = dimensionsHeight / rect.height;
+    const x = (e.clientX - rect.left) * scaleX - centerAxisX;
+    const y = (e.clientY - rect.top) * scaleY - centerAxisY;
+    const dist = Math.sqrt(x * x + y * y);
+    if (dist < dynamicRadius - LINE_W / 2 || dist > dynamicRadius + LINE_W / 2) return;
+    let angle = Math.atan2(y, x);
+    if (angle < -Math.PI / 2) angle += Math.PI * 2;
+    const hit = computingMetricsMatrix.find(c => angle >= c.start && angle <= c.end);
+    if (hit) elements.chartHint.textContent = `${hit.name}: ${formatCurrencyValue(hit.volume)}`;
+  };
+}
+
+function renderMonthlyBarChart() {
+  const monthsMap = new Map();
+  state.transactions.forEach(t => {
+    const d = new Date(t.dateTime);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (!monthsMap.has(key)) monthsMap.set(key, { income: 0, expense: 0 });
+    monthsMap.get(key)[t.type] += t.amount;
+  });
+
+  const sortedRows = [...monthsMap.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 6);
+
+  const maxVal = Math.max(1, ...sortedRows.map(([, v]) => Math.max(v.income, v.expense)));
+
+  elements.monthlyBars.innerHTML = sortedRows.length
+    ? sortedRows.map(([month, v]) => `
+      <div class="bar-row">
+        <div class="bar-line" style="display:flex; justify-content:space-between; font-size:0.88rem; font-weight:600;">
+          <strong>${month}</strong>
+          <span class="muted">Inflow: ${formatCurrencyValue(v.income)} · Outflow: ${formatCurrencyValue(v.expense)}</span>
+        </div>
+        <div class="bar-track" style="margin-top:4px;"><span style="width: ${(v.expense / maxVal) * 100}%; background-color: var(--expense)"></span></div>
+        <div class="bar-track" style="margin-top:2px;"><span style="width: ${(v.income / maxVal) * 100}%; background-color: var(--income)"></span></div>
+      </div>
+    `).join("")
+    : `<p class="muted" style="text-align:center; padding:12px 0;">Operational sequence contains no monthly progression indexes.</p>`;
+}
+
+function renderBudgetsViewport() {
+  const documentMemoryFragment = document.createDocumentFragment();
+  elements.budgetCards.innerHTML = "";
+
+  state.budgets.forEach(b => {
+    const totals = aggregateBudgetData(b.id);
+    const spentPercent = b.limit > 0 ? Math.min(100, (totals.expenses / b.limit) * 100) : 0;
+    const card = document.createElement("article");
+    const activeClass = b.id === state.activeBudgetId ? " active" : "";
+    card.className = `budget-card-premium animate-slide-up${activeClass}`;
+    card.style.cursor = "pointer";
+    card.innerHTML = `
+      <div class="budget-card-meta">
+        <h3>${escapeOutputHtml(b.name)}</h3>
+        <strong class="amount">${formatCurrencyValue(totals.balance)} left</strong>
+      </div>
+      <div class="bar-track">
+        <span style="width: ${spentPercent}%; background-color: ${spentPercent > 90 ? 'var(--expense)' : 'var(--primary)'}"></span>
+      </div>
+      <div class="budget-card-footer-telemetry">
+        <span>Limit: ${formatCurrencyValue(b.limit)}</span>
+        <span>Spent: ${formatCurrencyValue(totals.expenses)}</span>
+      </div>
+      <footer style="display:flex; gap:8px; margin-top:20px; border-top:1px solid var(--line); padding-top:14px;">
+        <button type="button" class="btn-secondary-sm edit-budget-trigger">Edit</button>
+        <button type="button" class="btn-secondary-sm btn-text-danger delete-budget-trigger">Delete</button>
+      </footer>
+    `;
+
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      triggerTactileFeedback();
+      state.activeBudgetId = b.id;
+      displayStatusToastNotification(`Switched to ${b.name}`);
+    });
+
+    card.querySelector(".edit-budget-trigger").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openBudgetDialog(b.id);
+    });
+    card.querySelector(".delete-budget-trigger").addEventListener("click", (e) => {
+      e.stopPropagation();
+      executeBudgetPurgeSequence(b.id);
+    });
+
+    documentMemoryFragment.appendChild(card);
+  });
+
+  elements.budgetCards.appendChild(documentMemoryFragment);
+}
+
+function renderControlSettingsTaxonomy() {
+  const layoutDocumentFragment = document.createDocumentFragment();
+  elements.categoryCards.innerHTML = "";
+
+  state.categories.forEach(categoryNode => {
+    const structuralContainerNode = document.createElement("div");
+    structuralContainerNode.className = "category-management-pill panel-card";
+    structuralContainerNode.innerHTML = `
+      <div class="category-header-node">
+        <span class="category-icon" style="background-color: ${categoryNode.color}">${categoryNode.icon}</span>
+        <div>
+          <h4>${escapeOutputHtml(categoryNode.name)}</h4>
+          <span class="caption-muted">${categoryNode.type === "both" ? "INCOME & EXPENSE" : categoryNode.type === "income" ? "INCOME ONLY" : "EXPENSE ONLY"}</span>
+        </div>
+      </div>
+      <footer style="display:flex; gap:8px; margin-top:14px; border-top:1px solid var(--line); padding-top:10px;">
+        <button type="button" class="btn-secondary-sm edit-cat-trigger">Edit</button>
+        <button type="button" class="btn-secondary-sm btn-text-danger delete-cat-trigger">Delete</button>
+      </footer>
+    `;
+
+    structuralContainerNode.querySelector(".edit-cat-trigger").addEventListener("click", () => openCategoryDialog(categoryNode.id));
+    structuralContainerNode.querySelector(".delete-cat-trigger").addEventListener("click", () => executeCategoryPurgeSequence(categoryNode.id));
+
+    layoutDocumentFragment.appendChild(structuralContainerNode);
+  });
+  elements.categoryCards.appendChild(layoutDocumentFragment);
+}
+
+// ── DATA MUTATIONS & SYSTEMS ALIGNMENT ENGINE ─────────────────────────
+function openBudgetDialog(budgetId = "") {
+  const budget = budgetId ? state.budgets.find(b => b.id === budgetId) : null;
   elements.budgetDialogTitle.textContent = budget ? "Edit Budget" : "Create Budget";
   elements.budgetId.value = budget?.id || "";
   elements.budgetName.value = budget?.name || "";
@@ -1022,74 +790,175 @@ function openBudgetDialog(id = "") {
 
 function saveBudgetFromForm() {
   try {
-    addOrUpdateBudget({
-      id: elements.budgetId.value,
-      name: elements.budgetName.value,
-      limit: parseAmount(elements.budgetLimit.value),
-    });
+    triggerTactileFeedback();
+    const budgetId = elements.budgetId.value;
+    const name = elements.budgetName.value.trim();
+    const limit = parseAmount(elements.budgetLimit.value) || 0;
+
+    if (!name) {
+      displayStatusToastNotification("Please enter a valid budget name.");
+      return;
+    }
+
+    if (budgetId) {
+      const budget = state.budgets.find(b => b.id === budgetId);
+      if (budget) {
+        budget.name = name;
+        budget.limit = roundMoney(limit);
+      }
+    } else {
+      state.budgets.push({
+        id: createUUID("b"),
+        name: name,
+        limit: roundMoney(limit),
+        archived: false
+      });
+    }
     elements.budgetDialog.close();
-    render();
-    showToast("Budget saved");
-  } catch (error) {
-    showToast(error.message);
+    displayStatusToastNotification("Budget successfully saved.");
+  } catch (e) {
+    displayStatusToastNotification(e.message);
   }
 }
 
-function openCategoryDialog(id = "") {
-  const cat = id ? getCategory(id) : null;
-  elements.categoryDialogTitle.textContent = cat ? "Edit Category" : "Add Category";
+function executeBudgetPurgeSequence(budgetId) {
+  if (state.budgets.length <= 1) {
+    displayStatusToastNotification("At least one budget is required.");
+    return;
+  }
+  if (!confirm("Are you sure you want to delete this budget? All transactions mapped to it will be permanently deleted!")) return;
+  triggerTactileFeedback();
+  state.budgets = state.budgets.filter(b => b.id !== budgetId);
+  state.transactions = state.transactions.filter(t => t.budgetId !== budgetId);
+  if (state.activeBudgetId === budgetId) state.activeBudgetId = state.budgets[0].id;
+  displayStatusToastNotification("Budget successfully deleted.");
+}
+
+function openCategoryDialog(catId = "") {
+  const cat = catId ? state.categories.find(c => c.id === catId) : null;
+  elements.categoryDialogTitle.textContent = cat ? "Edit Category" : "Create Category";
   elements.categoryId.value = cat?.id || "";
   elements.categoryName.value = cat?.name || "";
   elements.categoryType.value = cat?.type || "both";
-  elements.categoryIcon.value = cat?.icon || "●";
-  elements.categoryColor.value = cat?.color || "#176b5d";
+  elements.categoryIcon.value = cat?.icon || "📦";
+  elements.categoryColor.value = cat?.color || "#059669";
   elements.categoryDialog.showModal();
 }
 
 function saveCategoryFromForm() {
   try {
-    addOrUpdateCategory({
-      id: elements.categoryId.value,
-      name: elements.categoryName.value,
-      type: elements.categoryType.value,
-      icon: elements.categoryIcon.value,
-      color: elements.categoryColor.value,
-    });
+    triggerTactileFeedback();
+    const catId = elements.categoryId.value;
+    const name = elements.categoryName.value.trim();
+    const type = elements.categoryType.value;
+    const icon = elements.categoryIcon.value.trim() || "📦";
+    const color = elements.categoryColor.value;
+
+    if (!name) {
+      displayStatusToastNotification("Please enter a valid category name.");
+      return;
+    }
+
+    if (catId) {
+      const cat = state.categories.find(c => c.id === catId);
+      if (cat) {
+        cat.name = name;
+        cat.type = type;
+        cat.icon = icon;
+        cat.color = color;
+      }
+    } else {
+      state.categories.push({
+        id: createUUID("c"),
+        name: name,
+        type: type,
+        icon: icon,
+        color: color
+      });
+    }
     elements.categoryDialog.close();
-    render();
-    showToast("Category saved");
-  } catch (error) {
-    showToast(error.message);
+    displayStatusToastNotification("Category successfully saved.");
+  } catch (e) {
+    displayStatusToastNotification(e.message);
   }
 }
 
-// ── Export ─────────────────────────────────────────────────────────────────────
+function executeCategoryPurgeSequence(catId) {
+  if (state.categories.length <= 1) {
+    displayStatusToastNotification("At least one category is required.");
+    return;
+  }
+  if (!confirm("Are you sure you want to delete this category? All transactions mapped to it will be moved to Others.")) return;
+  triggerTactileFeedback();
+  state.transactions.forEach(t => {
+    if (t.categoryId === catId) t.categoryId = "others";
+  });
+  state.categories = state.categories.filter(c => c.id !== catId);
+  displayStatusToastNotification("Category successfully deleted.");
+}
 
+function triggerModificationModal(transactionId) {
+  const targetEntry = state.transactions.find(t => t.id === transactionId);
+  if (!targetEntry) return;
+
+  elements.transactionId.value = targetEntry.id;
+  elements.transactionAmount.value = targetEntry.amount;
+  elements.transactionDescription.value = targetEntry.description;
+  elements.transactionDateTime.value = targetEntry.dateTime;
+  elements.transactionNotes.value = targetEntry.notes;
+  elements.transactionType.value = targetEntry.type;
+  renderTransactionCategoryOptions(targetEntry.type);
+  elements.transactionBudget.value = targetEntry.budgetId;
+  elements.transactionCategory.value = targetEntry.categoryId;
+  
+  elements.transactionDialogTitle.textContent = "Edit Transaction";
+  elements.transactionReceipt.value = "";
+  updateReceiptPrompt();
+  elements.transactionDialog.showModal();
+}
+
+function executeLogPurgeSequence(transactionId) {
+  if (!confirm("Are you sure you want to permanently delete this transaction?")) return;
+  triggerTactileFeedback();
+  state.transactions = state.transactions.filter(t => t.id !== transactionId);
+  displayStatusToastNotification("Transaction successfully deleted.");
+}
+
+function sortTransactions() {
+  state.transactions.sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+}
+
+// ── CUSTOM MULTI-FORMAT EXPORTS ENGINE ──────────────────────────────
 function getExportRows() {
   const txs = getFilteredTransactions();
-  const totals = calculateGlobalTotals(txs);
+  const totals = aggregateGlobalFinancials();
   
   let limit = 0;
   if (filters.budgetIds.length === 1) {
-    limit = getBudget(filters.budgetIds[0]).limit;
+    limit = state.budgets.find(b => b.id === filters.budgetIds[0])?.limit || 0;
   } else {
-    limit = sum(state.budgets.filter((b) => !b.archived).map((b) => b.limit));
+    limit = computeSum(state.budgets.filter(b => !b.archived).map(b => b.limit));
   }
   totals.limit = limit;
 
-  const rows = txs.map((t) => ({
-    title: t.description,
-    amount: t.type === "income" ? t.amount : -t.amount,
-    type: t.type,
-    category: getCategory(t.categoryId).name,
-    budget: getBudget(t.budgetId).name,
-    dateTime: formatDateTime(t.dateTime),
-    notes: t.notes,
-  }));
+  const rows = txs.map((t) => {
+    const cat = state.categories.find(c => c.id === t.categoryId) || {};
+    const bud = state.budgets.find(b => b.id === t.budgetId) || {};
+    return {
+      title: t.description,
+      amount: t.type === "income" ? t.amount : -t.amount,
+      type: t.type,
+      category: cat.name || "General",
+      budget: bud.name || "Operations",
+      dateTime: formatDateTime(t.dateTime),
+      notes: t.notes,
+    };
+  });
   return { rows, totals };
 }
 
 function exportCsv() {
+  triggerTactileFeedback();
   const { rows, totals } = getExportRows();
   const now = new Date().toLocaleString("en-IN");
   const csvRows = [
@@ -1119,10 +988,11 @@ function exportCsv() {
     new Blob([csvRows.map(csvLine).join("\n")], { type: "text/csv;charset=utf-8;" }),
     reportFilename("csv")
   );
-  showToast("CSV exported");
+  displayStatusToastNotification("CSV exported successfully.");
 }
 
 function exportXlsx() {
+  triggerTactileFeedback();
   const { rows, totals } = getExportRows();
   const now = new Date().toLocaleString("en-IN");
   const data = [
@@ -1156,6 +1026,7 @@ function exportXlsx() {
     ["_rels/.rels", XLSX_RELS],
     ["xl/workbook.xml", XLSX_WORKBOOK],
     ["xl/_rels/workbook.xml.rels", XLSX_WORKBOOK_RELS],
+    ["xl/styles.xml", XLSX_STYLES],
     ["xl/worksheets/sheet1.xml", sheetXml],
   ]);
   downloadBlob(
@@ -1164,25 +1035,23 @@ function exportXlsx() {
     }),
     reportFilename("xlsx")
   );
-  showToast("Excel exported");
+  displayStatusToastNotification("Excel file exported successfully.");
 }
 
 function exportPdf() {
+  triggerTactileFeedback();
   const { rows, totals } = getExportRows();
   downloadBlob(
     new Blob([buildPdfTable(rows, totals)], { type: "application/pdf" }),
     reportFilename("pdf")
   );
-  showToast("PDF exported");
+  displayStatusToastNotification("PDF Report exported.");
 }
 
 function buildPdfTable(rows, totals) {
   const pages = [];
   const rowsPerPage = 18;
-
-  for (let i = 0; i < rows.length; i += rowsPerPage) {
-    pages.push(rows.slice(i, i + rowsPerPage));
-  }
+  for (let i = 0; i < rows.length; i += rowsPerPage) pages.push(rows.slice(i, i + rowsPerPage));
 
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
@@ -1225,7 +1094,7 @@ function pdfPageTable(rows, totals, page, totalPages) {
   const commands = [
     "0.95 0.98 0.97 rg 0 0 612 792 re f",
     "BT /F2 14 Tf 0 0 0 rg",
-    `1 0 0 1 36 ${y} Tm (FINANCE MANAGER) Tj`,
+    `1 0 0 1 36 ${y} Tm (FINANCE MANAGER PRO REPORT) Tj`,
     "ET",
     "BT /F1 8 Tf 0.35 0.42 0.4 rg",
     `1 0 0 1 520 ${y} Tm (Page ${page}/${totalPages}) Tj`,
@@ -1233,7 +1102,6 @@ function pdfPageTable(rows, totals, page, totalPages) {
   ];
 
   y -= 20;
-
   commands.push("BT /F2 10 Tf 0 0 0 rg");
   commands.push(`1 0 0 1 36 ${y} Tm (SUMMARY) Tj`);
   commands.push("ET");
@@ -1259,13 +1127,11 @@ function pdfPageTable(rows, totals, page, totalPages) {
   commands.push("ET");
 
   y -= 18;
-
   commands.push("BT /F2 10 Tf 0 0 0 rg");
   commands.push(`1 0 0 1 36 ${y} Tm (TRANSACTIONS) Tj`);
   commands.push("ET");
 
   y -= 14;
-
   const headers = ["Title", "Amount", "Type", "Category", "Budget", "Date", "Notes"];
   let x = 36;
   const tableWidth = colWidths.reduce((a, b) => a + b);
@@ -1273,19 +1139,17 @@ function pdfPageTable(rows, totals, page, totalPages) {
   commands.push("BT /F2 8 Tf 1 1 1 rg");
 
   headers.forEach((h, i) => {
-    commands.push(`1 0 0 1 ${x + 2} ${y + 3} Tm (${pdfText(h)}) Tj`);
+    commands.push(`1 0 0 1 ${x + 2} ${y + 3} Tm ${pdfText(h)} Tj`);
     x += colWidths[i];
   });
   commands.push("ET");
 
   y -= 14;
-
   commands.push("0 0 0 rg 0.5 w");
   commands.push(`36 ${y} ${36 + tableWidth} ${y} l S`);
 
   rows.forEach((r) => {
     if (y < 50) return;
-
     x = 36;
     const rowData = [
       r.title.slice(0, 20),
@@ -1296,140 +1160,17 @@ function pdfPageTable(rows, totals, page, totalPages) {
       r.dateTime.slice(0, 10),
       r.notes.slice(0, 15),
     ];
-
     commands.push("BT /F1 7.5 Tf 0 0 0 rg");
     rowData.forEach((cell, i) => {
-      commands.push(`1 0 0 1 ${x + 1} ${y - 8} Tm (${pdfText(cell)}) Tj`);
+      commands.push(`1 0 0 1 ${x + 1} ${y - 8} Tm ${pdfText(cell)} Tj`);
       x += colWidths[i];
     });
     commands.push("ET");
-
     y -= rowHeight;
     commands.push(`36 ${y} ${36 + tableWidth} ${y} l S`);
   });
-
   return commands.join("\n");
 }
-
-function csvLine(values) {
-  return values.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",");
-}
-
-function reportFilename(ext) {
-  return `finance-report-${todayDate()}.${ext}`;
-}
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-// ── Backup & restore ───────────────────────────────────────────────────────────
-
-function backupData() {
-  downloadBlob(
-    new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
-    `finance-backup-${todayDate()}.json`
-  );
-  showToast("Backup exported");
-}
-
-async function restoreData(file) {
-  try {
-    const text = await file.text();
-    state = normalizeState(JSON.parse(text));
-    saveState();
-    render();
-    showToast("Backup restored");
-  } catch {
-    showToast("Backup file could not be restored");
-  }
-}
-
-// ── UI helpers ─────────────────────────────────────────────────────────────────
-
-function setLoading(value) {
-  elements.loading.hidden = !value;
-}
-
-function showToast(message) {
-  elements.toast.textContent = message;
-  elements.toast.classList.add("show");
-  window.clearTimeout(showToast.timer);
-  showToast.timer = window.setTimeout(
-    () => elements.toast.classList.remove("show"),
-    2400
-  );
-}
-
-async function updateStorageUsageEstimate() {
-  if (navigator.storage && navigator.storage.estimate && elements.storageUsage) {
-    try {
-      const estimate = await navigator.storage.estimate();
-      const usedKB = Math.round(estimate.usage / 1024);
-      if (usedKB > 1024) {
-        elements.storageUsage.textContent = `Storage usage: ${(usedKB / 1024).toFixed(2)} MB`;
-      } else {
-        elements.storageUsage.textContent = `Storage usage: ${usedKB} KB`;
-      }
-    } catch {
-      elements.storageUsage.textContent = "Storage usage: Unknown";
-    }
-  } else if (elements.storageUsage) {
-    elements.storageUsage.textContent = "Storage usage: Estimate not available";
-  }
-}
-
-function initTheme() {
-  const theme = state.themePreference || "system";
-  applyTheme(theme);
-}
-
-function applyTheme(theme) {
-  document.documentElement.setAttribute("data-theme-preference", theme);
-  if (theme === "system") {
-    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
-  } else {
-    document.documentElement.setAttribute("data-theme", theme);
-  }
-  // If analytics canvas is rendered, redraw to apply theme colors!
-  if (activeView === "analytics") {
-    renderAnalytics();
-  }
-}
-
-async function resetAllApplicationData() {
-  if (!confirm("Are you sure you want to completely RESET ALL DATA?\n\nThis will permanently delete all budgets, transactions, categories, and settings. This cannot be undone!")) return;
-  try {
-    setLoading(true);
-    const db = await openDB();
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    await new Promise((resolve, reject) => {
-      const req = store.clear();
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
-    localStorage.removeItem(STORAGE_KEY);
-    state = createInitialState();
-    initTheme();
-    render();
-    showToast("Application completely reset");
-  } catch (err) {
-    showToast("Reset failed: " + err.message);
-  } finally {
-    setLoading(false);
-  }
-}
-
-// ── Low-level helpers ──────────────────────────────────────────────────────────
 
 function pdfText(value) {
   const text = String(value)
@@ -1450,7 +1191,7 @@ function xlsxCell(row, col, value, bold = false) {
   const ref = `${columnName(col)}${row}`;
   const style = bold ? ' s="2"' : '';
   if (typeof value === "number") return `<c r="${ref}"${style}><v>${value}</v></c>`;
-  return `<c r="${ref}" t="inlineStr"${style}><is><t>${escapeHtml(value)}</t></is></c>`;
+  return `<c r="${ref}" t="inlineStr"${style}><is><t>${escapeOutputHtml(value)}</t></is></c>`;
 }
 
 function columnName(index) {
@@ -1527,210 +1268,489 @@ function crc32(bytes) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-const XLSX_CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`;
+const XLSX_CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
 const XLSX_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
 const XLSX_WORKBOOK = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Transactions" sheetId="1" r:id="rId1"/></sheets></workbook>`;
-const XLSX_WORKBOOK_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`;
+const XLSX_WORKBOOK_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+const XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>`;
 
-// ── Event listeners ────────────────────────────────────────────────────────────
-
-document.addEventListener("click", (e) => {
-  const card = e.target.closest("[data-select-budget]");
-  const target = e.target.closest("button");
-  if (card && !target) {
-    state.activeBudgetId = card.dataset.selectBudget;
-    saveState();
-    render();
-    showToast("Budget switched");
-    return;
-  }
-  if (!target) return;
-  if (target.dataset.nav) setView(target.dataset.nav);
-  if (target.dataset.openTransaction) openTransactionDialog(target.dataset.openTransaction);
-  if (target.dataset.openBudget !== undefined) openBudgetDialog();
-  if (target.dataset.editTransaction) openTransactionDialog("expense", target.dataset.editTransaction);
-  if (target.dataset.deleteTransaction) deleteTransaction(target.dataset.deleteTransaction);
-  if (target.dataset.viewReceipt) viewReceipt(target.dataset.viewReceipt);
-  if (target.dataset.editBudget) openBudgetDialog(target.dataset.editBudget);
-  if (target.dataset.deleteBudget) deleteBudget(target.dataset.deleteBudget);
-  if (target.dataset.editCategory) openCategoryDialog(target.dataset.editCategory);
-  if (target.dataset.deleteCategory) deleteCategory(target.dataset.deleteCategory);
-  if (target.dataset.export === "csv") exportCsv();
-  if (target.dataset.export === "xlsx") exportXlsx();
-  if (target.dataset.export === "pdf") exportPdf();
-});
-
-document.addEventListener("keydown", (e) => {
-  if ((e.key !== "Enter" && e.key !== " ") || !e.target.matches("[data-select-budget]")) return;
-  e.preventDefault();
-  state.activeBudgetId = e.target.dataset.selectBudget;
-  saveState();
-  render();
-  showToast("Budget switched");
-});
-
-// Dialog close buttons (type="button" — no form submit side-effects)
-document.querySelector("#closeTransactionDialog")?.addEventListener("click", () =>
-  elements.transactionDialog.close()
-);
-document.querySelector("#cancelTransactionButton")?.addEventListener("click", () =>
-  elements.transactionDialog.close()
-);
-document.querySelector("#closeBudgetDialog")?.addEventListener("click", () =>
-  elements.budgetDialog.close()
-);
-document.querySelector("#cancelBudgetButton")?.addEventListener("click", () =>
-  elements.budgetDialog.close()
-);
-document.querySelector("#closeCategoryDialog")?.addEventListener("click", () =>
-  elements.categoryDialog.close()
-);
-document.querySelector("#cancelCategoryButton")?.addEventListener("click", () =>
-  elements.categoryDialog.close()
-);
-document.querySelector("#closeReceiptDialog")?.addEventListener("click", () =>
-  elements.receiptDialog.close()
-);
-
-// Close dialog on backdrop click
-[elements.transactionDialog, elements.budgetDialog, elements.categoryDialog, elements.receiptDialog].forEach((dlg) => {
-  dlg?.addEventListener("click", (e) => {
-    if (e.target === dlg) dlg.close();
-  });
-});
-
-elements.searchToggle.addEventListener("click", () => {
-  elements.searchPanel.hidden = !elements.searchPanel.hidden;
-  if (!elements.searchPanel.hidden) elements.globalSearch.focus();
-});
-
-elements.globalSearch.addEventListener("input", () => {
-  filters.search = elements.globalSearch.value;
-  renderTransactions();
-});
-
-elements.activeBudgetSelect.addEventListener("change", () => {
-  state.activeBudgetId = elements.activeBudgetSelect.value;
-  saveState();
-  render();
-});
-
-elements.analyticsBudgetSelect.addEventListener("change", () => {
-  analyticsBudgetId = elements.analyticsBudgetSelect.value;
-  renderAnalytics();
-});
-
-elements.typeTabs.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-type-filter]");
-  if (!btn) return;
-  filters.type = btn.dataset.typeFilter;
-  elements.typeTabs
-    .querySelectorAll("button")
-    .forEach((b) => b.classList.toggle("active", b === btn));
-  renderTransactions();
-});
-
-elements.quickFilter.addEventListener("change", () => {
-  filters.quick = elements.quickFilter.value;
-  renderTransactions();
-});
-
-elements.fromDate.addEventListener("change", () => {
-  filters.from = elements.fromDate.value;
-  renderTransactions();
-});
-
-elements.toDate.addEventListener("change", () => {
-  filters.to = elements.toDate.value;
-  renderTransactions();
-});
-
-elements.categoryFilter.addEventListener("change", () => {
-  filters.categoryId = elements.categoryFilter.value;
-  renderTransactions();
-});
-
-elements.budgetFilter.addEventListener("change", () => {
-  filters.budgetIds =
-    elements.budgetFilter.value === "all" ? [] : [elements.budgetFilter.value];
-  renderTransactions();
-});
-
-elements.clearFilters.addEventListener("click", () => {
-  filters = { type: "all", quick: "all", from: "", to: "", categoryId: "all", budgetIds: [], search: "" };
-  elements.globalSearch.value = "";
-  elements.quickFilter.value = "all";
-  elements.fromDate.value = "";
-  elements.toDate.value = "";
-  elements.typeTabs
-    .querySelectorAll("button")
-    .forEach((b) => b.classList.toggle("active", b.dataset.typeFilter === "all"));
-  render();
-  showToast("Filters cleared");
-});
-
-elements.saveTransactionButton.addEventListener("click", saveTransactionFromForm);
-elements.saveBudgetButton.addEventListener("click", saveBudgetFromForm);
-elements.openCategoryButton.addEventListener("click", () => openCategoryDialog());
-elements.saveCategoryButton.addEventListener("click", saveCategoryFromForm);
-elements.backupButton.addEventListener("click", backupData);
-elements.restoreInput.addEventListener("change", () => {
-  const file = elements.restoreInput.files[0];
-  if (file) restoreData(file);
-});
-elements.resetBudgetButton.addEventListener("click", resetActiveBudget);
-elements.transactionType.addEventListener("change", () =>
-  renderTransactionCategoryOptions(elements.transactionType.value)
-);
-
-elements.themeSelect.addEventListener("change", () => {
-  state.themePreference = elements.themeSelect.value;
-  saveState();
-  applyTheme(state.themePreference);
-});
-
-elements.currencySelect.addEventListener("change", () => {
-  state.preferredCurrency = elements.currencySelect.value;
-  saveState();
-  render();
-  showToast("Base currency updated");
-});
-
-elements.resetAllDataButton.addEventListener("click", resetAllApplicationData);
-
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  if (state.themePreference === "system") {
-    applyTheme("system");
-  }
-});
-
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredInstallPrompt = e;
-  elements.installButton.hidden = false;
-});
-
-elements.installButton.addEventListener("click", async () => {
-  if (!deferredInstallPrompt) return;
-  deferredInstallPrompt.prompt();
-  await deferredInstallPrompt.userChoice;
-  deferredInstallPrompt = null;
-  elements.installButton.hidden = true;
-});
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("sw.js")
-      .catch(() => showToast("Offline support could not be started"));
-  });
+function csvLine(values) {
+  return values.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",");
 }
 
-// ── Boot ───────────────────────────────────────────────────────────────────────
+function reportFilename(ext) {
+  return `wealth-ledger-report-${new Date().toISOString().slice(0, 10)}.${ext}`;
+}
 
-(async function boot() {
-  await loadStateAsync();
-  initTheme();
-  sortTransactions();
-  render();
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ── BACKUP & RESTORE State Packages ───────────────────────────────
+function backupData() {
+  triggerTactileFeedback();
+  downloadBlob(
+    new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
+    `wealth-pro-backup-${new Date().toISOString().slice(0, 10)}.json`
+  );
+  displayStatusToastNotification("Backup exported successfully.");
+}
+
+async function restoreData(file) {
+  try {
+    triggerTactileFeedback();
+    const text = await file.text();
+    const parsed = normalizeIncomingState(JSON.parse(text));
+    
+    // Assign values dynamically to proxy so it auto-renders and commits
+    state.budgets = parsed.budgets;
+    state.categories = parsed.categories;
+    state.transactions = parsed.transactions;
+    state.preferredCurrency = parsed.preferredCurrency;
+    state.themePreference = parsed.themePreference;
+    state.activeBudgetId = parsed.activeBudgetId;
+
+    initTheme();
+    displayStatusToastNotification("Backup imported successfully.");
+  } catch (e) {
+    displayStatusToastNotification("Import failed: " + e.message);
+  }
+}
+
+// ── THEME PREFERENCE ENGINE ─────────────────────────────────────────
+function initTheme() {
+  const theme = state?.themePreference || "system";
+  applyTheme(theme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme-preference", theme);
+  if (theme === "system") {
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+  } else {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+  if (activeView === "analytics") {
+    renderAnalyticsDistributionEngine();
+  }
+}
+
+// ── DANGER ZONE RESET ENGINE ───────────────────────────────────────
+async function resetAllApplicationData() {
+  if (!confirm("Are you sure you want to completely RESET ALL DATA?\n\nThis will permanently delete all budgets, transactions, categories, and settings. This cannot be undone!")) return;
+  try {
+    setLoading(true);
+    triggerTactileFeedback();
+    const db = await accessDB();
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    await new Promise((resolve, reject) => {
+      const req = store.clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem("finance-manager-v1");
+    
+    // Reset state reactive values
+    const fallback = normalizeIncomingState(null);
+    state.budgets = fallback.budgets;
+    state.categories = fallback.categories;
+    state.transactions = fallback.transactions;
+    state.preferredCurrency = fallback.preferredCurrency;
+    state.themePreference = fallback.themePreference;
+    state.activeBudgetId = fallback.activeBudgetId;
+
+    initTheme();
+    displayStatusToastNotification("All data has been reset.");
+  } catch (err) {
+    displayStatusToastNotification("Reset failed: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function resetActiveBudget() {
+  const budget = state.budgets.find(b => b.id === state.activeBudgetId);
+  if (!budget) return;
+  if (!confirm(`Are you sure you want to clear all transactions from the budget "${budget.name}"?`)) return;
+  triggerTactileFeedback();
+  state.transactions = state.transactions.filter(t => t.budgetId !== budget.id);
+  displayStatusToastNotification("Budget transactions cleared.");
+}
+
+// ── ASYNC FORM TRANSACTION SAVER ──────────────────────────────────
+async function saveTransactionFromForm() {
+  try {
+    setLoading(true);
+    triggerTactileFeedback();
+    
+    const existingId = elements.transactionId.value;
+    const existingTx = existingId ? state.transactions.find(t => t.id === existingId) : null;
+    
+    const receiptFile = elements.transactionReceipt.files[0];
+    let receiptData = existingTx?.receiptData || "";
+    
+    if (receiptFile) {
+      try {
+        const compressed = await readReceipt(receiptFile);
+        receiptData = compressed.receiptData;
+      } catch (err) {
+        displayStatusToastNotification(err.message);
+        setLoading(false);
+        return;
+      }
+    }
+    
+    const txAmount = parseFloat(elements.transactionAmount.value) || 0;
+    if (txAmount <= 0) {
+      displayStatusToastNotification("Please enter a valid transaction amount.");
+      setLoading(false);
+      return;
+    }
+    if (!elements.transactionDescription.value.trim()) {
+      displayStatusToastNotification("Please enter a description.");
+      setLoading(false);
+      return;
+    }
+
+    const transactionalModel = {
+      id: existingId || createUUID("tx"),
+      amount: roundMoney(txAmount),
+      description: elements.transactionDescription.value.trim(),
+      dateTime: elements.transactionDateTime.value || nowLocalInput(),
+      categoryId: elements.transactionCategory.value || "others",
+      budgetId: elements.transactionBudget.value || "personal",
+      notes: elements.transactionNotes.value.trim(),
+      type: elements.transactionType.value || "expense",
+      receiptData: receiptData
+    };
+
+    if (existingId) {
+      const index = state.transactions.findIndex(t => t.id === existingId);
+      if (index !== -1) {
+        state.transactions[index] = transactionalModel;
+      }
+    } else {
+      state.transactions.push(transactionalModel);
+    }
+
+    sortTransactions();
+    elements.transactionDialog.close();
+    displayStatusToastNotification("Transaction saved successfully.");
+  } catch (e) {
+    displayStatusToastNotification(e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── UI AND FORM ASSISTANT HELPERS ──────────────────────────────────
+function setLoading(val) {
+  if (elements.loading) elements.loading.hidden = !val;
+}
+
+function updateReceiptPrompt() {
+  if (!elements.dropzonePrompt) return;
+  const file = elements.transactionReceipt.files[0];
+  if (file) {
+    elements.dropzonePrompt.textContent = `📎 ${file.name}`;
+    elements.dropzonePrompt.style.color = "var(--primary)";
+    elements.dropzonePrompt.style.fontWeight = "600";
+  } else {
+    const existingId = elements.transactionId.value;
+    const existingTx = existingId ? state.transactions.find(t => t.id === existingId) : null;
+    if (existingTx && existingTx.receiptData) {
+      elements.dropzonePrompt.textContent = "📎 Existing receipt attached (click to change)";
+      elements.dropzonePrompt.style.color = "var(--primary)";
+      elements.dropzonePrompt.style.fontWeight = "600";
+    } else {
+      elements.dropzonePrompt.textContent = "Upload receipt photo here";
+      elements.dropzonePrompt.style.color = "var(--muted)";
+      elements.dropzonePrompt.style.fontWeight = "normal";
+    }
+  }
+}
+
+function displayStatusToastNotification(messageString) {
+  if (!elements.toast) return;
+  elements.toast.textContent = messageString;
+  elements.toast.classList.add("show");
+  clearTimeout(displayStatusToastNotification.timer);
+  displayStatusToastNotification.timer = setTimeout(() => elements.toast.classList.remove("show"), 3000);
+}
+
+async function updateStorageTelemetryMetrics() {
+  if (navigator.storage && navigator.storage.estimate && elements.storageUsage) {
+    try {
+      const statistics = await navigator.storage.estimate();
+      const storageKiloBytesUsed = Math.round(statistics.usage / 1024);
+      if (storageKiloBytesUsed > 1024) {
+        elements.storageUsage.textContent = `Storage usage: ${(storageKiloBytesUsed / 1024).toFixed(2)} MB`;
+      } else {
+        elements.storageUsage.textContent = `Storage usage: ${storageKiloBytesUsed} KB`;
+      }
+    } catch {
+      elements.storageUsage.textContent = "Storage usage: Offline";
+    }
+  }
+}
+
+// ── EVENT LISTENERS INTERACTIVE DISPATCH MATRIX ──────────────────────
+function initializeSystemEventMappers() {
+  elements.navButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      triggerTactileFeedback();
+      const nextViewTarget = btn.dataset.nav;
+      activeView = nextViewTarget;
+      elements.views.forEach(v => v.classList.toggle("active", v.dataset.view === nextViewTarget));
+      elements.navButtons.forEach(b => b.classList.toggle("active", b === btn));
+      if (nextViewTarget === "analytics") {
+        renderAnalyticsDistributionEngine();
+        renderMonthlyBarChart();
+      }
+    });
+  });
+
+  // Wire up any [data-nav] buttons outside the nav hub (e.g., "View Analytics" on home)
+  document.querySelectorAll("[data-nav]").forEach(btn => {
+    if (!btn.closest(".system-navigation-hub")) {
+      btn.addEventListener("click", () => {
+        triggerTactileFeedback();
+        const target = btn.dataset.nav;
+        activeView = target;
+        elements.views.forEach(v => v.classList.toggle("active", v.dataset.view === target));
+        elements.navButtons.forEach(b => b.classList.toggle("active", b.dataset.nav === target));
+        if (target === "analytics") {
+          renderAnalyticsDistributionEngine();
+          renderMonthlyBarChart();
+        }
+      });
+    }
+  });
+
+  // Analytics budget filter dropdown
+  elements.analyticsBudgetSelect.addEventListener("change", () => {
+    triggerTactileFeedback();
+    analyticsBudgetId = elements.analyticsBudgetSelect.value;
+    renderAnalyticsDistributionEngine();
+    renderMonthlyBarChart();
+  });
+
+  elements.activeBudgetSelect.addEventListener("change", event => {
+    triggerTactileFeedback();
+    state.activeBudgetId = event.target.value;
+    displayStatusToastNotification(`Focus switched.`);
+  });
+
+  elements.searchToggle.addEventListener("click", () => {
+    triggerTactileFeedback();
+    elements.searchPanel.hidden = !elements.searchPanel.hidden;
+    if (!elements.searchPanel.hidden) elements.globalSearch.focus();
+  });
+
+  elements.globalSearch.addEventListener("input", () => {
+    filters.search = elements.globalSearch.value;
+    renderLedgerTimelineViewport();
+  });
+
+  document.querySelectorAll("[data-open-transaction]").forEach(elementTrigger => {
+    elementTrigger.addEventListener("click", () => {
+      triggerTactileFeedback();
+      elements.transactionForm.reset();
+      elements.transactionId.value = "";
+      elements.transactionDateTime.value = nowLocalInput();
+      elements.transactionType.value = elementTrigger.dataset.openTransaction;
+      renderTransactionCategoryOptions(elementTrigger.dataset.openTransaction);
+      elements.transactionDialogTitle.textContent = elementTrigger.dataset.openTransaction === "income" ? "Add Income" : "Add Expense";
+      updateReceiptPrompt();
+      elements.transactionDialog.showModal();
+    });
+  });
+
+  elements.saveTransactionButton.addEventListener("click", saveTransactionFromForm);
+  elements.transactionReceipt.addEventListener("change", updateReceiptPrompt);
+  elements.transactionType.addEventListener("change", () => {
+    renderTransactionCategoryOptions(elements.transactionType.value);
+  });
+
+  document.querySelectorAll("[data-open-budget]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      triggerTactileFeedback();
+      document.querySelector('#budgetForm')?.reset();
+      elements.budgetId.value = "";
+      openBudgetDialog();
+    });
+  });
+  elements.saveBudgetButton.addEventListener("click", saveBudgetFromForm);
+
+  elements.openCategoryButton.addEventListener("click", () => {
+    triggerTactileFeedback();
+    elements.categoryForm?.reset();
+    elements.categoryId.value = "";
+    openCategoryDialog();
+  });
+  elements.saveCategoryButton.addEventListener("click", saveCategoryFromForm);
+
+  elements.backupButton.addEventListener("click", backupData);
+  elements.restoreInput.addEventListener("change", () => {
+    const file = elements.restoreInput.files[0];
+    if (file) restoreData(file);
+  });
+
+  elements.themeSelect.addEventListener("change", () => {
+    triggerTactileFeedback();
+    state.themePreference = elements.themeSelect.value;
+    applyTheme(state.themePreference);
+  });
+
+  elements.currencySelect.addEventListener("change", () => {
+    triggerTactileFeedback();
+    state.preferredCurrency = elements.currencySelect.value;
+    displayStatusToastNotification("Currency preference updated.");
+  });
+
+  elements.resetBudgetButton.addEventListener("click", resetActiveBudget);
+  elements.resetAllDataButton.addEventListener("click", resetAllApplicationData);
+
+  // Filters timeline binding
+  elements.typeTabs.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-type-filter]");
+    if (!btn) return;
+    triggerTactileFeedback();
+    filters.type = btn.dataset.typeFilter;
+    elements.typeTabs
+      .querySelectorAll("button")
+      .forEach((b) => b.classList.toggle("active", b === btn));
+    renderLedgerTimelineViewport();
+  });
+
+  elements.quickFilter.addEventListener("change", () => {
+    triggerTactileFeedback();
+    filters.quick = elements.quickFilter.value;
+    renderLedgerTimelineViewport();
+  });
+
+  elements.fromDate.addEventListener("change", () => {
+    filters.from = elements.fromDate.value;
+    renderLedgerTimelineViewport();
+  });
+
+  elements.toDate.addEventListener("change", () => {
+    filters.to = elements.toDate.value;
+    renderLedgerTimelineViewport();
+  });
+
+  elements.categoryFilter.addEventListener("change", () => {
+    triggerTactileFeedback();
+    filters.categoryId = elements.categoryFilter.value;
+    renderLedgerTimelineViewport();
+  });
+
+  elements.budgetFilter.addEventListener("change", () => {
+    triggerTactileFeedback();
+    filters.budgetIds =
+      elements.budgetFilter.value === "all" ? [] : [elements.budgetFilter.value];
+    renderLedgerTimelineViewport();
+  });
+
+  elements.clearFilters.addEventListener("click", () => {
+    triggerTactileFeedback();
+    filters = { type: "all", quick: "all", from: "", to: "", categoryId: "all", budgetIds: [], search: "" };
+    elements.globalSearch.value = "";
+    elements.quickFilter.value = "all";
+    elements.fromDate.value = "";
+    elements.toDate.value = "";
+    elements.categoryFilter.value = "all";
+    elements.budgetFilter.value = "all";
+    elements.typeTabs
+      .querySelectorAll("button")
+      .forEach((b) => b.classList.toggle("active", b.dataset.typeFilter === "all"));
+    renderLedgerTimelineViewport();
+    displayStatusToastNotification("Filters reset successfully.");
+  });
+
+  // Export binding
+  document.querySelectorAll("[data-export]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.export;
+      if (mode === "csv") exportCsv();
+      if (mode === "xlsx") exportXlsx();
+      if (mode === "pdf") exportPdf();
+    });
+  });
+
+  // Automatic Dynamic Modals Dismissals Traps
+  [elements.transactionDialog, elements.budgetDialog, elements.categoryDialog, elements.receiptDialog].forEach(modalBox => {
+    modalBox?.addEventListener("click", evt => { if (evt.target === modalBox) modalBox.close(); });
+  });
+  
+  document.querySelector("#closeTransactionDialog").addEventListener("click", () => elements.transactionDialog.close());
+  document.querySelector("#cancelTransactionButton").addEventListener("click", () => elements.transactionDialog.close());
+  document.querySelector("#closeBudgetDialog").addEventListener("click", () => elements.budgetDialog.close());
+  document.querySelector("#cancelBudgetButton").addEventListener("click", () => elements.budgetDialog.close());
+  document.querySelector("#closeCategoryDialog").addEventListener("click", () => elements.categoryDialog.close());
+  document.querySelector("#cancelCategoryButton").addEventListener("click", () => elements.categoryDialog.close());
+  document.querySelector("#closeReceiptDialog").addEventListener("click", () => elements.receiptDialog.close());
+}
+
+// ── BOOTSTRAP INITIALIZATION PROCEDURES ─────────────────────────────
+(async function executeSystemBootSequence() {
+  try {
+    await executeMigrationSequence(); // Backward-compatible v1 migration
+    const stateArchiveCheckpoint = await retrievePersistedState();
+    const standardizedStateData = normalizeIncomingState(stateArchiveCheckpoint);
+    
+    // Bind Reactive Wrapper Object targeting system drawing pipes
+    state = makeReactive(standardizedStateData, () => {
+      commitStateToStorage(state);
+      executeRenderSequence();
+    });
+
+    initializeSystemEventMappers();
+    initTheme();
+    executeRenderSequence();
+
+    // PWA Service Worker loading registration
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => console.warn("Offline caching disabled."));
+      });
+    }
+
+    // PWA custom installer handlers
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      if (elements.installButton) elements.installButton.hidden = false;
+    });
+
+    if (elements.installButton) {
+      elements.installButton.addEventListener("click", async () => {
+        if (!deferredInstallPrompt) return;
+        triggerTactileFeedback();
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        elements.installButton.hidden = true;
+      });
+    }
+
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      if (state.themePreference === "system") {
+        applyTheme("system");
+      }
+    });
+
+  } catch (criticalInitializationError) {
+    console.error("System structural kernel crash context details:", criticalInitializationError);
+  }
 })();
