@@ -1744,6 +1744,11 @@ function initializeSystemEventMappers() {
       });
     }
 
+    window.addEventListener("appinstalled", (e) => {
+      deferredInstallPrompt = null;
+      if (elements.installButton) elements.installButton.hidden = true;
+    });
+
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
       if (state.themePreference === "system") {
         applyTheme("system");
