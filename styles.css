@@ -112,6 +112,12 @@ html, body {
   margin-bottom: 40px;
 }
 
+.title-with-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .eyebrow {
   font-size: 0.75rem;
   font-weight: 700;

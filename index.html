@@ -19,12 +19,14 @@
       <header class="app-header">
         <div class="brand-group">
           <p class="eyebrow">My Wallet</p>
-          <h1>Finance Manager</h1>
+          <div class="title-with-search">
+            <h1>Finance Manager</h1>
+            <button class="icon-button ghost" id="searchToggle" type="button" aria-label="Search transactions" title="Search">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </button>
+          </div>
         </div>
         <div class="header-actions">
-          <button class="icon-button ghost" id="searchToggle" type="button" aria-label="Search transactions" title="Search">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </button>
           <button class="action-badge-btn" id="installButton" type="button" hidden>Install App</button>
         </div>
       </header>
